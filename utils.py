@@ -48,7 +48,7 @@ def add_table_with_images(doc, header_text, image_path1, image_path2):
     # Add images to each cell in the table
     for i, image_path in enumerate([image_path1, image_path2]):
         cell = table.cell(0, i)
-        set_cell_margins(cell, top=144, start=144, bottom=0, end=144)
+        set_cell_margins(table, left=72, right=72, top=72, bottom=0)
         paragraph = cell.paragraphs[0]
         paragraph.alignment = WD_TABLE_ALIGNMENT.CENTER
         run = paragraph.add_run()
@@ -145,38 +145,20 @@ def set_table_borders(table):
     tblPr.append(tbl_borders)
 
 # Helper function to handle namespace-qualified names
-def qn(tag):
-    return '{http://schemas.openxmlformats.org/wordprocessingml/2006/main}' + tag
+# def qn(tag):
+#     return '{http://schemas.openxmlformats.org/wordprocessingml/2006/main}' + tag
 
 
-def set_cell_margins(cell, **kwargs):
-    """
-    Set cell margins (cell padding) for a single table cell.
+def set_cell_margins(table, left=0, right=0, top=0, bottom=0):
 
-    Parameters:
-    - cell: The table cell to modify.
-    - kwargs: Margins to set (top, start, bottom, end) in twips (1/20 of a point).
+    tc = table._element
+    tblPr = tc.tblPr
+    tblCellMar = OxmlElement('w:tblCellMar')
+    kwargs = {"left":left, "right":right, "top":top, "bottom":bottom}
+    for m in ["left","right", "top", "bottom"]:
+        node = OxmlElement("w:{}".format(m))
+        node.set(qn('w:w'), str(kwargs.get(m)))
+        node.set(qn('w:type'), 'dxa')
+        tblCellMar.append(node)
 
-    Usage:
-    set_cell_margins(cell, top=50, start=50, bottom=50, end=50)
-    """
-    tc = cell._tc  # Access the XML element of the cell
-    tcPr = tc.get_or_add_tcPr()  # Get or add the table cell properties element
-
-    # Find or create the 'w:tcMar' element
-    tcMar = tcPr.find(qn('w:tcMar'))
-    if tcMar is None:
-        tcMar = OxmlElement('w:tcMar')  # Use 'w:tcMar' without qn()
-        tcPr.append(tcMar)
-
-    for m in ('top', 'start', 'bottom', 'end'):
-        if m in kwargs:
-            margin_value = str(kwargs[m])
-            # Find or create the margin element
-            element = tcMar.find(qn('w:' + m))
-            if element is None:
-                element = OxmlElement('w:' + m)  # Use 'w:' prefix without qn()
-                tcMar.append(element)
-            # Set attributes without using qn(), and without prefixes
-            element.set('w', margin_value)  # Margin width in twips
-            element.set('type', 'dxa')      # Unit type (dxa = twips)
+    tblPr.append(tblCellMar)
