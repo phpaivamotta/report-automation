@@ -3,12 +3,13 @@ from docx.opc.coreprops import CoreProperties
 from docx.shared import Inches
 from utils import add_table_with_images
 from utils import replace_text_in_table
+from utils import add_captions_with_win32com
 
 # Inputs
-report_file_path = r"C:\Users\phpai\OneDrive\Desktop\Python\word-docs\Sample Report - Copy.docx"
+report_file_path = r"C:\Users\pmotto\OneDrive - Maverick Applied Science\Desktop\Report Automation\Sample Report - Copy.docx"
 
-image_path_1 = r"C:\Users\phpai\OneDrive\Desktop\Python\word-docs\image1.jpg"
-image_path_2 = r"C:\Users\phpai\OneDrive\Desktop\Python\word-docs\image2.jpg"
+image_path_1 = r"C:\Users\pmotto\OneDrive - Maverick Applied Science\Desktop\Report Automation\image1.jpg"
+image_path_2 = r"C:\Users\pmotto\OneDrive - Maverick Applied Science\Desktop\Report Automation\image2.jpg"
 
 doc_core_properties = {
     "title": "Title", # customer
@@ -51,3 +52,7 @@ if __name__ == "__main__":
 
     # Save the modified document
     doc.save('modified_document.docx')
+
+    doc_file_path = r'C:\Users\pmotto\OneDrive - Maverick Applied Science\Desktop\Report Automation\modified_document.docx'
+
+    add_captions_with_win32com(doc_file_path)
