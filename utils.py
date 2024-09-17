@@ -58,6 +58,7 @@ def add_table_with_images(doc, header_text, image_path1, image_path2):
     doc.save('modified_document.docx')
     print("Document modified successfully.")
 
+
 def replace_text_in_paragraph(paragraph, old_texts, new_texts):
     for old_text, new_text in zip(old_texts, new_texts):
         if old_text in paragraph.text:
@@ -67,11 +68,13 @@ def replace_text_in_paragraph(paragraph, old_texts, new_texts):
             run.font.name = 'Calibri (Body)'
             run.font.size = Pt(11)
 
+
 def replace_text_in_table(table, old_texts, new_texts):
     for row in table.rows:
         for cell in row.cells:
             for paragraph in cell.paragraphs:
                 replace_text_in_paragraph(paragraph, old_texts, new_texts)
+
 
 def add_captions_with_win32com(doc_path):
     # Open Word application
@@ -144,13 +147,8 @@ def set_table_borders(table):
     # Append the borders element to the table properties
     tblPr.append(tbl_borders)
 
-# Helper function to handle namespace-qualified names
-# def qn(tag):
-#     return '{http://schemas.openxmlformats.org/wordprocessingml/2006/main}' + tag
-
 
 def set_cell_margins(table, left=0, right=0, top=0, bottom=0):
-
     tc = table._element
     tblPr = tc.tblPr
     tblCellMar = OxmlElement('w:tblCellMar')
