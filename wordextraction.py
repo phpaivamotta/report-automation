@@ -131,6 +131,6 @@ def extract_and_save(docx_path, output_folder):
     print(f"Images saved in {output_folder}")
 
 # Usage NEEDS DOCM TO BE SAVED AS DOCX
-docx_path = r''
+docx_path = r'C:\Users\dfernandez\OneDrive - Maverick Applied Science\Desktop\ReportInputsTemplate.docx'
 output_folder = 'image_temp'
 extract_and_save(docx_path, output_folder)
