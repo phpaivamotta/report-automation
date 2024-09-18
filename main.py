@@ -15,8 +15,8 @@ template_file_path = os.getenv('TEMPLATE_DOC_PATH')
 output_doc_file_path = os.getenv('OUTPUT_REPORT_DOC_PATH')
 
 # Inputs
-image_path_1 = r"C:\Users\phpai\OneDrive\Desktop\report-automation\image1.jpg"
-image_path_2 = r"C:\Users\phpai\OneDrive\Desktop\report-automation\image2.jpg"
+image_path_1 = r"C:\Users\phpai\OneDrive\Desktop\report-automation\image1.jpeg"
+image_path_2 = r"C:\Users\phpai\OneDrive\Desktop\report-automation\image8.jpeg"
 
 doc_core_properties = {
     "title": "Title", # customer
