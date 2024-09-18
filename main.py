@@ -4,13 +4,19 @@ from docx.shared import Inches
 from utils import add_table_with_images
 from utils import replace_text_in_table
 from utils import add_captions_with_win32com
+from dotenv import load_dotenv
+import os
+
+
+
+# Load environment variables from .env file
+load_dotenv()
+image_path_1 = os.getenv('IMAGE_PATH_1')
+image_path_2 = os.getenv('IMAGE_PATH_2')
+template_file_path = os.getenv('TEMPLATE_DOC_PATH')
+output_doc_file_path = os.getenv('OUTPUT_REPORT_DOC_PATH')
 
 # Inputs
-report_file_path = r"C:\Users\pmotto\OneDrive - Maverick Applied Science\Desktop\Report Automation\Sample Report - Copy.docx"
-
-image_path_1 = r"C:\Users\pmotto\OneDrive - Maverick Applied Science\Desktop\Report Automation\image1.jpg"
-image_path_2 = r"C:\Users\pmotto\OneDrive - Maverick Applied Science\Desktop\Report Automation\image2.jpg"
-
 doc_core_properties = {
     "title": "Title", # customer
     "author": "author", # from
@@ -34,7 +40,7 @@ custom_properties = {
 if __name__ == "__main__":
 
     # Open an existing document
-    doc = Document(report_file_path)
+    doc = Document(template_file_path)
 
     # Modify core properties
     core_properties = doc.core_properties
@@ -53,6 +59,4 @@ if __name__ == "__main__":
     # Save the modified document
     doc.save('modified_document.docx')
 
-    doc_file_path = r'C:\Users\pmotto\OneDrive - Maverick Applied Science\Desktop\Report Automation\modified_document.docx'
-
-    add_captions_with_win32com(doc_file_path)
+    add_captions_with_win32com(output_doc_file_path)

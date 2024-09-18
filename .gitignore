@@ -1,5 +1,6 @@
 .venv
-/__pychache__
+__pycache__/
 image1.jpg
 image2.jpg
 Sample Report.docx
+modified_document.docx
