@@ -58,6 +58,6 @@ if __name__ == "__main__":
     add_table_with_images(doc, "Inspection Observations:", image_path_1, image_path_2)
 
     # Save the modified document
-    doc.save('modified_document.docx')
+    doc.save(output_doc_file_path)
 
     add_captions_with_win32com(output_doc_file_path)
