@@ -10,7 +10,7 @@ import os
 
 
 # Load environment variables from .env file
-load_dotenv()
+load_dotenv(override=True)
 template_file_path = os.getenv('TEMPLATE_DOC_PATH')
 output_doc_file_path = os.getenv('OUTPUT_REPORT_DOC_PATH')
 
@@ -60,4 +60,5 @@ if __name__ == "__main__":
     # Save the modified document
     doc.save(output_doc_file_path)
 
+    # Add captions to images
     add_captions_with_win32com(output_doc_file_path)

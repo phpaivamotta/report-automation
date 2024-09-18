@@ -55,7 +55,7 @@ def add_table_with_images(doc, header_text, image_path1, image_path2):
         run.add_picture(image_path, width=Inches(3.6))  # Adjust width as needed
 
     # Save the modified document
-    doc.save('modified_document.docx')
+    # doc.save('modified_document.docx')
     print("Document modified successfully.")
 
 
@@ -89,14 +89,20 @@ def add_captions_with_win32com(doc_path):
         # Select the inline shape (image)
         inline_shape.Select()
 
-        # Insert a caption for the selected image
-        word.Selection.InsertCaption(Label="Figure", Title=": This is the caption text.", TitleAutoText="", ExcludeLabel=False)
+        # Insert a caption for the selected image (exclude custom title, only label + number)
+        word.Selection.InsertCaption(Label="Figure", Title=". Figure caption", ExcludeLabel=False, Position=win32.constants.wdCaptionPositionBelow)
+
+        # Move the selection to the end of the caption
+        word.Selection.MoveRight(Unit=win32.constants.wdWord, Count=1, Extend=win32.constants.wdExtend)
+
+        # Delete any text after the caption label (if any text remains after "Figure X")
+        word.Selection.TypeBackspace()
 
     # Update all fields (important for cross-references)
     doc.Fields.Update()
 
     # Save and close the document
-    doc.Save()
+    # doc.Save()
     # doc.Close()
     # word.Quit()
 
