@@ -11,12 +11,13 @@ import os
 
 # Load environment variables from .env file
 load_dotenv()
-image_path_1 = os.getenv('IMAGE_PATH_1')
-image_path_2 = os.getenv('IMAGE_PATH_2')
 template_file_path = os.getenv('TEMPLATE_DOC_PATH')
 output_doc_file_path = os.getenv('OUTPUT_REPORT_DOC_PATH')
 
 # Inputs
+image_path_1 = r"C:\Users\phpai\OneDrive\Desktop\report-automation\image1.jpg"
+image_path_2 = r"C:\Users\phpai\OneDrive\Desktop\report-automation\image2.jpg"
+
 doc_core_properties = {
     "title": "Title", # customer
     "author": "author", # from
