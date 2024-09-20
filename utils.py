@@ -7,6 +7,7 @@ from docx.oxml import OxmlElement, parse_xml
 from docx.oxml.ns import nsdecls
 from docx.oxml.ns import qn
 import time
+import os
 
 
 
@@ -77,7 +78,7 @@ def replace_text_in_table(table, old_texts, new_texts):
                 replace_text_in_paragraph(paragraph, old_texts, new_texts)
 
 
-def add_captions_with_win32com(doc_path):
+def add_captions_with_win32com(doc_path, images):
     # Open Word application
     word = win32.Dispatch('Word.Application')
     word.Visible = False  # Set to True if you want to see Word while working
@@ -86,15 +87,19 @@ def add_captions_with_win32com(doc_path):
     doc = word.Documents.Open(doc_path)
 
     # Loop through all inline shapes (images) in the document
-    for inline_shape in doc.InlineShapes:
+    for i, inline_shape in enumerate(doc.InlineShapes):
+        # Get image file name
+        file_name = os.path.basename(images[i])
+        file_name = ". " + file_name
+
         # Select the inline shape (image)
         inline_shape.Select()
 
         # Insert a caption for the selected image (exclude custom title, only label + number)
-        word.Selection.InsertCaption(Label="Figure", Title=". Figure caption", ExcludeLabel=False, Position=win32.constants.wdCaptionPositionBelow)
+        word.Selection.InsertCaption(Label="Figure", Title=file_name, ExcludeLabel=False, Position=-1)
 
         # Move the selection to the end of the caption
-        word.Selection.MoveRight(Unit=win32.constants.wdWord, Count=1, Extend=win32.constants.wdExtend)
+        word.Selection.MoveRight(Unit=2, Count=1, Extend=1)
 
         # Delete any text after the caption label (if any text remains after "Figure X")
         word.Selection.TypeBackspace()
@@ -201,93 +206,130 @@ def add_bullets_above_tables(output_doc_file_path):
 
 
 def append_cross_references_to_bullets(docx_path):
-    """Append cross-references to the beginning of each bullet point without deleting text."""
+    """Append cross-references to the beginning of each bullet point and make Figure 1 and Figure 2 bold."""
     # Open Word application
     word = win32.Dispatch('Word.Application')
-    word.Visible = False  # Set to True if you want to see Word while working
+    word.Visible = True  # Set to True if you want to see Word while working
 
     # Open the existing document
     doc = word.Documents.Open(docx_path)
 
-    # Add a small delay to ensure the document is ready
-    time.sleep(2)  # Delay for 2 seconds
+    try:
+        # Get the cross-reference items for "Figure"
+        ref_items = doc.GetCrossReferenceItems("Figure")
+        
+        # Debug: Print available cross-reference items
+        print("Available cross-reference items for 'Figure':")
+        for idx, item in enumerate(ref_items):
+            print(f"{idx+1}: {item}")
+        
+        if len(ref_items) < 2:
+            print("Error: There are fewer than two figures to reference.")
+            doc.Close(False)
+            word.Quit()
+            return
 
-    # Get the cross-reference items for "Figure"
-    ref_items = doc.GetCrossReferenceItems("Figure")
-    
-    # Debug: Print available cross-reference items
-    print("Available cross-reference items for 'Figure':")
-    for idx, item in enumerate(ref_items):
-        print(f"{idx+1}: {item}")
-    
-    if len(ref_items) < 2:
-        print("Error: There are fewer than two figures to reference.")
+        # Set the figure references for bullet 1 and bullet 2
+        figure_1_ref = 1  # Reference to Figure 1
+        figure_2_ref = 2  # Reference to Figure 2
+
+        # Loop through the paragraphs to find bullet points and append cross-references
+        for para in doc.Paragraphs:
+            if para.Range.Text.strip() == "Bullet point 1":
+                # Move the cursor to the beginning of the paragraph and insert the cross-reference for Figure 1
+                word.Selection.SetRange(para.Range.Start, para.Range.Start)
+                word.Selection.InsertCrossReference(
+                    ReferenceType="Figure",
+                    ReferenceKind=3,  # 3 corresponds to wdOnlyLabelAndNumber (Figure X)
+                    ReferenceItem=figure_1_ref,
+                    InsertAsHyperlink=True,  # Optional: make it a hyperlink
+                    IncludePosition=False,
+                    SeparateNumbers=False,
+                    SeparatorString=" "
+                )
+
+                time.sleep(4)
+
+                # Bold the inserted Figure 1 text
+                word.Selection.MoveLeft(Unit=1, Count=1, Extend=True)  # 1 = wdCharacter
+                word.Selection.Font.Bold = True
+
+                time.sleep(4)
+
+                # Move cursor to the end of the bolded Figure 1 text
+                word.Selection.Collapse(Direction=0)
+
+                time.sleep(4)
+
+                word.Selection.TypeText(" ")  # Add a space before the original text
+
+                word.Selection.Font.Bold = False
+
+                word.Selection.TypeText("shows ")  # Add a space before the original text
+
+                # Move the selection to the end of the caption
+                word.Selection.MoveRight(Unit=1, Count=14, Extend=1) #Bullet point 1
+
+                # Delete any text after the caption label (if any text remains after "Figure X")
+                word.Selection.TypeBackspace()
+                
+                time.sleep(4)
+
+                set_font_formatting(para, word)
+
+            elif para.Range.Text.strip() == "Bullet point 2":
+                # Move the cursor to the beginning of the paragraph and insert the cross-reference for Figure 2
+                word.Selection.SetRange(para.Range.Start, para.Range.Start)
+                word.Selection.InsertCrossReference(
+                    ReferenceType="Figure",
+                    ReferenceKind=3,  # 3 corresponds to wdOnlyLabelAndNumber (Figure X)
+                    ReferenceItem=figure_2_ref,
+                    InsertAsHyperlink=True,  # Optional: make it a hyperlink
+                    IncludePosition=False,
+                    SeparateNumbers=False,
+                    SeparatorString=" "
+                )
+
+                time.sleep(4)
+
+                # Bold the inserted Figure 2 text
+                word.Selection.MoveLeft(Unit=1, Count=1, Extend=True)  # 1 = wdCharacter
+                word.Selection.Font.Bold = True
+
+                time.sleep(4)
+
+                # Move cursor to the end of the bolded Figure 2 text
+                word.Selection.Collapse(Direction=0)
+
+                time.sleep(4)
+
+                word.Selection.TypeText(" ")  # Add a space before the original text
+
+                word.Selection.Font.Bold = False
+
+                word.Selection.TypeText("shows ")  # Add a space before the original text
+
+                # Move the selection to the end of the caption
+                word.Selection.MoveRight(Unit=1, Count=14, Extend=1) #Bullet point 1
+
+                # Delete any text after the caption label (if any text remains after "Figure X")
+                word.Selection.TypeBackspace()
+
+                time.sleep(4)
+
+                set_font_formatting(para, word)
+
+        # Save the document with cross-references
+        doc.SaveAs(docx_path)
+        doc.Close()
+        word.Quit()
+
+        print(f"Cross-references appended and both Figure 1 and Figure 2 made bold, saved to {docx_path}")
+
+    except Exception as e:
+        print(f"An error occurred: {e}")
         doc.Close(False)
         word.Quit()
-        return
-
-    # Set the figure references for bullet 1 and bullet 2
-    figure_1_ref = 1  # Reference to Figure 1
-    figure_2_ref = 2  # Reference to Figure 2
-
-    # Loop through the paragraphs to find bullet points and append cross-references
-    for para in doc.Paragraphs:
-        if para.Range.Text.strip() == "Bullet point 1":
-            # Move the cursor to the beginning of the paragraph and insert the cross-reference
-            word.Selection.SetRange(para.Range.Start, para.Range.Start)
-            word.Selection.InsertCrossReference(
-                ReferenceType="Figure",
-                ReferenceKind=3,  # 3 corresponds to wdOnlyLabelAndNumber (Figure X)
-                ReferenceItem=figure_1_ref,
-                InsertAsHyperlink=True,  # Optional: make it a hyperlink
-                IncludePosition=False,
-                SeparateNumbers=False,
-                SeparatorString=" "
-            )
-
-            # Bold the inserted Figure 1 text
-            word.Selection.MoveLeft(Unit=win32.constants.wdCharacter, Count=len(ref_items[figure_1_ref-1]) + 1, Extend=True)  # Move selection to include Figure text
-            word.Selection.Font.Bold = True
-
-            # Move cursor to the end of the bolded Figure 1 text
-            word.Selection.Collapse(Direction=win32.constants.wdCollapseEnd)
-
-            # Append the original text
-            word.Selection.TypeText(" ")  # Add a space before the original text
-
-            set_font_formatting(para, word)
-
-        elif para.Range.Text.strip() == "Bullet point 2":
-            # Move the cursor to the beginning of the paragraph and insert the cross-reference
-            word.Selection.SetRange(para.Range.Start, para.Range.Start)
-            word.Selection.InsertCrossReference(
-                ReferenceType="Figure",
-                ReferenceKind=3,  # 3 corresponds to wdOnlyLabelAndNumber (Figure X)
-                ReferenceItem=figure_2_ref,
-                InsertAsHyperlink=True,  # Optional: make it a hyperlink
-                IncludePosition=False,
-                SeparateNumbers=False,
-                SeparatorString=" "
-            )
-            
-            # Bold the inserted Figure 2 text
-            word.Selection.MoveLeft(Unit=win32.constants.wdCharacter, Count=len(ref_items[figure_2_ref-1]) + 1, Extend=True)  # Move selection to include Figure text
-            word.Selection.Font.Bold = True
-
-            # Move cursor to the end of the bolded Figure 2 text
-            word.Selection.Collapse(Direction=win32.constants.wdCollapseEnd)
-
-            # Append the original text
-            word.Selection.TypeText(" ")  # Add a space before the original text
-
-            set_font_formatting(para, word)
-
-    # Save the document with cross-references
-    doc.SaveAs(docx_path)
-    doc.Close()
-    word.Quit()
-
-    print(f"Cross-references appended to bullets and saved to {docx_path}")
 
 
 def set_font_formatting(para, word):
