@@ -4,6 +4,8 @@ from docx.shared import Inches
 from utils import add_table_with_images
 from utils import replace_text_in_table
 from utils import add_captions_with_win32com
+from utils import add_bullets_above_tables
+from utils import append_cross_references_to_bullets
 from dotenv import load_dotenv
 import os
 
@@ -15,8 +17,13 @@ template_file_path = os.getenv('TEMPLATE_DOC_PATH')
 output_doc_file_path = os.getenv('OUTPUT_REPORT_DOC_PATH')
 
 # Inputs
-image_path_1 = r"C:\Users\phpai\OneDrive\Desktop\report-automation\image1.jpeg"
-image_path_2 = r"C:\Users\phpai\OneDrive\Desktop\report-automation\image8.jpeg"
+image_path_1 = r"C:\Users\phpai\OneDrive\Desktop\report-automation\Images\image1.jpeg"
+image_path_2 = r"C:\Users\phpai\OneDrive\Desktop\report-automation\Images\image2.jpeg"
+
+images = [
+    image_path_1,
+    image_path_2
+]
 
 doc_core_properties = {
     "title": "Title", # customer
@@ -61,4 +68,10 @@ if __name__ == "__main__":
     doc.save(output_doc_file_path)
 
     # Add captions to images
-    add_captions_with_win32com(output_doc_file_path)
+    add_captions_with_win32com(output_doc_file_path, images)
+
+    # Add bullets above table
+    add_bullets_above_tables(output_doc_file_path)
+
+    # Add cross references
+    append_cross_references_to_bullets(output_doc_file_path)
