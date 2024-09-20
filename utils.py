@@ -248,18 +248,12 @@ def append_cross_references_to_bullets(docx_path):
                     SeparatorString=" "
                 )
 
-                time.sleep(4)
-
                 # Bold the inserted Figure 1 text
                 word.Selection.MoveLeft(Unit=1, Count=1, Extend=True)  # 1 = wdCharacter
                 word.Selection.Font.Bold = True
 
-                time.sleep(4)
-
                 # Move cursor to the end of the bolded Figure 1 text
                 word.Selection.Collapse(Direction=0)
-
-                time.sleep(4)
 
                 word.Selection.TypeText(" ")  # Add a space before the original text
 
@@ -272,8 +266,6 @@ def append_cross_references_to_bullets(docx_path):
 
                 # Delete any text after the caption label (if any text remains after "Figure X")
                 word.Selection.TypeBackspace()
-                
-                time.sleep(4)
 
                 set_font_formatting(para, word)
 
@@ -290,18 +282,12 @@ def append_cross_references_to_bullets(docx_path):
                     SeparatorString=" "
                 )
 
-                time.sleep(4)
-
                 # Bold the inserted Figure 2 text
                 word.Selection.MoveLeft(Unit=1, Count=1, Extend=True)  # 1 = wdCharacter
                 word.Selection.Font.Bold = True
 
-                time.sleep(4)
-
                 # Move cursor to the end of the bolded Figure 2 text
                 word.Selection.Collapse(Direction=0)
-
-                time.sleep(4)
 
                 word.Selection.TypeText(" ")  # Add a space before the original text
 
@@ -314,8 +300,6 @@ def append_cross_references_to_bullets(docx_path):
 
                 # Delete any text after the caption label (if any text remains after "Figure X")
                 word.Selection.TypeBackspace()
-
-                time.sleep(4)
 
                 set_font_formatting(para, word)
 
