@@ -6,6 +6,7 @@ from utils import replace_text_in_table
 from utils import add_captions_with_win32com
 from utils import add_bullets_above_tables
 from utils import append_cross_references_to_bullets
+from utils import delete_template_bullets
 from dotenv import load_dotenv
 import os
 
@@ -71,7 +72,9 @@ if __name__ == "__main__":
     add_captions_with_win32com(output_doc_file_path, images)
 
     # Add bullets above table
-    add_bullets_above_tables(output_doc_file_path)
+    doc = add_bullets_above_tables(output_doc_file_path)
+
+    delete_template_bullets(doc, output_doc_file_path)
 
     # Add cross references
     append_cross_references_to_bullets(output_doc_file_path)

@@ -198,8 +198,10 @@ def add_bullets_above_tables(output_doc_file_path):
             paragraph_before_table.addnext(bullet_2._element)
             bullet_2._element.addprevious(bullet_1._element)
 
-    doc.save(output_doc_file_path)
+    # doc.save(output_doc_file_path)
     print(f"Bullets added above all tables except the first")
+
+    return doc
 
 
 def append_cross_references_to_bullets(docx_path):
@@ -328,3 +330,19 @@ def set_paragraph_spacing(para, word):
     word.Selection.ParagraphFormat.SpaceBefore = 6
     word.Selection.ParagraphFormat.SpaceAfter = 6
     para.Style.NoSpaceBetweenParagraphsOfSameStyle = False
+
+
+def delete_template_bullets(doc, output_doc_file_path):
+    count = 0
+    for para in doc.paragraphs:
+        if para.style.name in ["List Bullet", "List Bullet 2", "List Bullet 3"]:
+            if count >= 3:
+                break
+            # Remove the paragraph from the parent element (body)
+            p = para._element
+            p.getparent().remove(p)
+            # Clean up after removing
+            p._element = p = None
+            count += 1
+
+    doc.save(output_doc_file_path)
