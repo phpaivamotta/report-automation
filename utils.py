@@ -8,10 +8,11 @@ from docx.oxml.ns import nsdecls
 from docx.oxml.ns import qn
 import time
 import os
+import glob
 
 
 
-def add_table_with_images(doc, header_text, image_path1, image_path2):
+def add_table_with_images(doc, header_text, num_cols, image_path1, image_path2=None):
    # Find the paragraph with the header text
     target_paragraph = None
     for paragraph in doc.paragraphs:
@@ -27,7 +28,7 @@ def add_table_with_images(doc, header_text, image_path1, image_path2):
 
     # Add a table after the new paragraph
     # We can't directly control placement through doc.add_table, so we'll insert it programmatically
-    table = doc.add_table(rows=1, cols=2)
+    table = doc.add_table(rows=1, cols=num_cols)
 
     set_table_borders(table)
 
@@ -48,13 +49,28 @@ def add_table_with_images(doc, header_text, image_path1, image_path2):
     target_paragraph._element.addnext(table._element)
 
     # Add images to each cell in the table
-    for i, image_path in enumerate([image_path1, image_path2]):
-        cell = table.cell(0, i)
+    if num_cols == 1:
+        cell = table.cell(0, 0)
         set_cell_margins(table, left=72, right=72, top=72, bottom=0)
         paragraph = cell.paragraphs[0]
         paragraph.alignment = WD_TABLE_ALIGNMENT.CENTER
         run = paragraph.add_run()
-        run.add_picture(image_path, width=Inches(3.6))  # Adjust width as needed
+        run.add_picture(image_path1, width=Inches(3.6))  # Adjust width as needed
+
+    elif num_cols == 2:
+        cell = table.cell(0, 0)
+        set_cell_margins(table, left=72, right=72, top=72, bottom=0)
+        paragraph = cell.paragraphs[0]
+        paragraph.alignment = WD_TABLE_ALIGNMENT.CENTER
+        run = paragraph.add_run()
+        run.add_picture(image_path1, width=Inches(3.6))  # Adjust width as needed
+
+        cell = table.cell(0, 1)
+        set_cell_margins(table, left=72, right=72, top=72, bottom=0)
+        paragraph = cell.paragraphs[0]
+        paragraph.alignment = WD_TABLE_ALIGNMENT.CENTER
+        run = paragraph.add_run()
+        run.add_picture(image_path2, width=Inches(3.6))  # Adjust width as needed
 
     # Save the modified document
     # doc.save('modified_document.docx')
@@ -78,7 +94,7 @@ def replace_text_in_table(table, old_texts, new_texts):
                 replace_text_in_paragraph(paragraph, old_texts, new_texts)
 
 
-def add_captions_with_win32com(doc_path, images):
+def add_captions_with_win32com(doc_path, i, num_cols, image_path1, image_path2=None):
     # Open Word application
     word = win32.Dispatch('Word.Application')
     word.Visible = False  # Set to True if you want to see Word while working
@@ -87,20 +103,43 @@ def add_captions_with_win32com(doc_path, images):
     doc = word.Documents.Open(doc_path)
 
     # Loop through all inline shapes (images) in the document
-    for i, inline_shape in enumerate(doc.InlineShapes):
+    # for i, inline_shape in enumerate(doc.InlineShapes):
+    
+    if num_cols == 1:
         # Get image file name
-        file_name = os.path.basename(images[i])
+        file_name = os.path.basename(image_path1)
         file_name = ". " + file_name
-
         # Select the inline shape (image)
-        inline_shape.Select()
-
+        doc.InlineShapes(i+1).Select() # The InlineShape() method is 1-based indexed
         # Insert a caption for the selected image (exclude custom title, only label + number)
         word.Selection.InsertCaption(Label="Figure", Title=file_name, ExcludeLabel=False, Position=-1)
-
         # Move the selection to the end of the caption
         word.Selection.MoveRight(Unit=2, Count=1, Extend=1)
+        # Delete any text after the caption label (if any text remains after "Figure X")
+        word.Selection.TypeBackspace()
 
+    elif num_cols ==  2:
+        # Get image file name
+        file_name = os.path.basename(image_path1)
+        file_name = ". " + file_name
+        # Select the inline shape (image)
+        doc.InlineShapes(i+1).Select() # The InlineShape() method is 1-based indexed
+        # Insert a caption for the selected image (exclude custom title, only label + number)
+        word.Selection.InsertCaption(Label="Figure", Title=file_name, ExcludeLabel=False, Position=-1)
+        # Move the selection to the end of the caption
+        word.Selection.MoveRight(Unit=2, Count=1, Extend=1)
+        # Delete any text after the caption label (if any text remains after "Figure X")
+        word.Selection.TypeBackspace()
+
+        # Get image file name
+        file_name = os.path.basename(image_path2)
+        file_name = ". " + file_name
+        # Select the inline shape (image)
+        doc.InlineShapes(i+2).Select() # The InlineShape() method is 1-based indexed
+        # Insert a caption for the selected image (exclude custom title, only label + number)
+        word.Selection.InsertCaption(Label="Figure", Title=file_name, ExcludeLabel=False, Position=-1)
+        # Move the selection to the end of the caption
+        word.Selection.MoveRight(Unit=2, Count=1, Extend=1)
         # Delete any text after the caption label (if any text remains after "Figure X")
         word.Selection.TypeBackspace()
 
@@ -175,7 +214,7 @@ def set_cell_margins(table, left=0, right=0, top=0, bottom=0):
 
 
 def add_bullets_above_tables(output_doc_file_path):
-    #Open doc
+    # Open doc
     doc = Document(output_doc_file_path)
 
     # Loop through all tables in the document
@@ -346,3 +385,16 @@ def delete_template_bullets(doc, output_doc_file_path):
             count += 1
 
     doc.save(output_doc_file_path)
+
+
+def get_images_from_folder(folder_path):
+    # Define the image extensions you want to search for
+    image_extensions = ['*.jpg', '*.jpeg', '*.png', '*.gif', '*.bmp', '*.tiff']
+
+    # List to store the image file paths
+    image_paths = []
+    # Loop through each image extension to grab matching files
+    for extension in image_extensions:
+        image_paths.extend(glob.glob(os.path.join(folder_path, extension)))
+
+    return image_paths
