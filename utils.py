@@ -12,8 +12,9 @@ import glob
 
 
 
-def add_table_with_images(doc, header_text, num_cols, image_path1, image_path2=None):
-   # Find the paragraph with the header text
+def add_table_with_images(doc, header_text, table_counter, num_cols, image_path1, image_path2=None):
+
+    # Find the paragraph with the header text
     target_paragraph = None
     for paragraph in doc.paragraphs:
         if header_text in paragraph.text:
@@ -72,9 +73,7 @@ def add_table_with_images(doc, header_text, num_cols, image_path1, image_path2=N
         run = paragraph.add_run()
         run.add_picture(image_path2, width=Inches(3.6))  # Adjust width as needed
 
-    # Save the modified document
-    # doc.save('modified_document.docx')
-    print("Document modified successfully.")
+    print("Table with images were added successfully.")
 
 
 def replace_text_in_paragraph(paragraph, old_texts, new_texts):
@@ -93,11 +92,13 @@ def replace_text_in_table(table, old_texts, new_texts):
             for paragraph in cell.paragraphs:
                 replace_text_in_paragraph(paragraph, old_texts, new_texts)
 
+    print("Project details in Table 1 were modified successfully.")
+
 
 def add_captions_with_win32com(doc_path, i, num_cols, image_path1, image_path2=None):
     # Open Word application
     word = win32.Dispatch('Word.Application')
-    word.Visible = False  # Set to True if you want to see Word while working
+    word.Visible = True  # Set to True if you want to see Word while working
 
     # Open the existing document
     doc = word.Documents.Open(doc_path)
@@ -213,22 +214,18 @@ def set_cell_margins(table, left=0, right=0, top=0, bottom=0):
     tblPr.append(tblCellMar)
 
 
-def add_bullets_above_tables(output_doc_file_path):
+def add_bullets_above_tables(output_doc_file_path, table_counter, num_cols):
     # Open doc
     doc = Document(output_doc_file_path)
 
     # Loop through all tables in the document
-    tables = doc.tables
+    table = doc.tables[table_counter+1] # Table 1 should be skipped since it is the properties table
 
-    for i, table in enumerate(tables):
-        # Skip the first table
-        if i == 0:
-            continue
+    # Find the paragraph just before the table
+    paragraph_before_table = table._element.getprevious()
 
-        # Find the paragraph just before the table
-        paragraph_before_table = table._element.getprevious()
-
-        if paragraph_before_table is not None:
+    if paragraph_before_table is not None:
+        if num_cols == 2:
             # Insert two bullet points above the table
             bullet_1 = doc.add_paragraph("Bullet point 1", style='List Bullet 2')
             bullet_2 = doc.add_paragraph("Bullet point 2", style='List Bullet 2')
@@ -237,125 +234,114 @@ def add_bullets_above_tables(output_doc_file_path):
             paragraph_before_table.addnext(bullet_2._element)
             bullet_2._element.addprevious(bullet_1._element)
 
+        if num_cols == 1:
+            # Insert two bullet points above the table
+            bullet_1 = doc.add_paragraph("Bullet point 1", style='List Bullet 2')
+            
+            # Insert the bullet points before the table
+            paragraph_before_table.addnext(bullet_1._element)
+
     # doc.save(output_doc_file_path)
     print(f"Bullets added above all tables except the first")
+
+    doc.save(output_doc_file_path)
 
     return doc
 
 
-def append_cross_references_to_bullets(docx_path):
+def append_cross_references_to_bullets(docx_path, i):
     """Append cross-references to the beginning of each bullet point and make Figure 1 and Figure 2 bold."""
     # Open Word application
     word = win32.Dispatch('Word.Application')
-    word.Visible = False  # Set to True if you want to see Word while working
+    word.Visible = True  # Set to True if you want to see Word while working
 
     # Open the existing document
     doc = word.Documents.Open(docx_path)
 
-    try:
-        # Get the cross-reference items for "Figure"
-        ref_items = doc.GetCrossReferenceItems("Figure")
-        
-        # Debug: Print available cross-reference items
-        print("Available cross-reference items for 'Figure':")
-        for idx, item in enumerate(ref_items):
-            print(f"{idx+1}: {item}")
-        
-        if len(ref_items) < 2:
-            print("Error: There are fewer than two figures to reference.")
-            doc.Close(False)
-            word.Quit()
-            return
+    # Set the figure references for bullet 1 and bullet 2
+    figure_1_ref = i + 1  # Reference to Figure 1
+    figure_2_ref = i + 2  # Reference to Figure 2
 
-        # Set the figure references for bullet 1 and bullet 2
-        figure_1_ref = 1  # Reference to Figure 1
-        figure_2_ref = 2  # Reference to Figure 2
+    # Loop through the paragraphs to find bullet points and append cross-references
+    for para in doc.Paragraphs:
+        if para.Range.Text.strip() == "Bullet point 1":
+            # Move the cursor to the beginning of the paragraph and insert the cross-reference for Figure 1
+            word.Selection.SetRange(para.Range.Start, para.Range.Start)
+            word.Selection.InsertCrossReference(
+                ReferenceType="Figure",
+                ReferenceKind=3,  # 3 corresponds to wdOnlyLabelAndNumber (Figure X)
+                ReferenceItem=figure_1_ref,
+                InsertAsHyperlink=True,  # Optional: make it a hyperlink
+                IncludePosition=False,
+                SeparateNumbers=False,
+                SeparatorString=" "
+            )
 
-        # Loop through the paragraphs to find bullet points and append cross-references
-        for para in doc.Paragraphs:
-            if para.Range.Text.strip() == "Bullet point 1":
-                # Move the cursor to the beginning of the paragraph and insert the cross-reference for Figure 1
-                word.Selection.SetRange(para.Range.Start, para.Range.Start)
-                word.Selection.InsertCrossReference(
-                    ReferenceType="Figure",
-                    ReferenceKind=3,  # 3 corresponds to wdOnlyLabelAndNumber (Figure X)
-                    ReferenceItem=figure_1_ref,
-                    InsertAsHyperlink=True,  # Optional: make it a hyperlink
-                    IncludePosition=False,
-                    SeparateNumbers=False,
-                    SeparatorString=" "
-                )
+            # Bold the inserted Figure 1 text
+            word.Selection.MoveLeft(Unit=1, Count=1, Extend=True)  # 1 = wdCharacter
+            word.Selection.Font.Bold = True
 
-                # Bold the inserted Figure 1 text
-                word.Selection.MoveLeft(Unit=1, Count=1, Extend=True)  # 1 = wdCharacter
-                word.Selection.Font.Bold = True
+            # Move cursor to the end of the bolded Figure 1 text
+            word.Selection.Collapse(Direction=0)
 
-                # Move cursor to the end of the bolded Figure 1 text
-                word.Selection.Collapse(Direction=0)
+            word.Selection.TypeText(" ")  # Add a space before the original text
 
-                word.Selection.TypeText(" ")  # Add a space before the original text
+            word.Selection.Font.Bold = False
 
-                word.Selection.Font.Bold = False
+            word.Selection.TypeText("shows ")  # Add a space before the original text
 
-                word.Selection.TypeText("shows ")  # Add a space before the original text
+            # Move the selection to the end of the caption
+            word.Selection.MoveRight(Unit=1, Count=14, Extend=1) #Bullet point 1
 
-                # Move the selection to the end of the caption
-                word.Selection.MoveRight(Unit=1, Count=14, Extend=1) #Bullet point 1
+            # Delete any text after the caption label (if any text remains after "Figure X")
+            word.Selection.TypeBackspace()
 
-                # Delete any text after the caption label (if any text remains after "Figure X")
-                word.Selection.TypeBackspace()
+            set_font_formatting(para, word)
 
-                set_font_formatting(para, word)
+            set_paragraph_spacing(para, word)
 
-                set_paragraph_spacing(para, word)
+        elif para.Range.Text.strip() == "Bullet point 2":
+            # Move the cursor to the beginning of the paragraph and insert the cross-reference for Figure 2
+            word.Selection.SetRange(para.Range.Start, para.Range.Start)
+            word.Selection.InsertCrossReference(
+                ReferenceType="Figure",
+                ReferenceKind=3,  # 3 corresponds to wdOnlyLabelAndNumber (Figure X)
+                ReferenceItem=figure_2_ref,
+                InsertAsHyperlink=True,  # Optional: make it a hyperlink
+                IncludePosition=False,
+                SeparateNumbers=False,
+                SeparatorString=" "
+            )
 
-            elif para.Range.Text.strip() == "Bullet point 2":
-                # Move the cursor to the beginning of the paragraph and insert the cross-reference for Figure 2
-                word.Selection.SetRange(para.Range.Start, para.Range.Start)
-                word.Selection.InsertCrossReference(
-                    ReferenceType="Figure",
-                    ReferenceKind=3,  # 3 corresponds to wdOnlyLabelAndNumber (Figure X)
-                    ReferenceItem=figure_2_ref,
-                    InsertAsHyperlink=True,  # Optional: make it a hyperlink
-                    IncludePosition=False,
-                    SeparateNumbers=False,
-                    SeparatorString=" "
-                )
+            # Bold the inserted Figure 2 text
+            word.Selection.MoveLeft(Unit=1, Count=1, Extend=True)  # 1 = wdCharacter
+            word.Selection.Font.Bold = True
 
-                # Bold the inserted Figure 2 text
-                word.Selection.MoveLeft(Unit=1, Count=1, Extend=True)  # 1 = wdCharacter
-                word.Selection.Font.Bold = True
+            # Move cursor to the end of the bolded Figure 2 text
+            word.Selection.Collapse(Direction=0)
 
-                # Move cursor to the end of the bolded Figure 2 text
-                word.Selection.Collapse(Direction=0)
+            word.Selection.TypeText(" ")  # Add a space before the original text
 
-                word.Selection.TypeText(" ")  # Add a space before the original text
+            word.Selection.Font.Bold = False
 
-                word.Selection.Font.Bold = False
+            word.Selection.TypeText("shows ")  # Add a space before the original text
 
-                word.Selection.TypeText("shows ")  # Add a space before the original text
+            # Move the selection to the end of the caption
+            word.Selection.MoveRight(Unit=1, Count=14, Extend=1) #Bullet point 1
 
-                # Move the selection to the end of the caption
-                word.Selection.MoveRight(Unit=1, Count=14, Extend=1) #Bullet point 1
+            # Delete any text after the caption label (if any text remains after "Figure X")
+            word.Selection.TypeBackspace()
 
-                # Delete any text after the caption label (if any text remains after "Figure X")
-                word.Selection.TypeBackspace()
+            set_font_formatting(para, word)
 
-                set_font_formatting(para, word)
+            set_paragraph_spacing(para, word)
 
-                set_paragraph_spacing(para, word)
+    # Save the document with cross-references
+    doc.SaveAs(docx_path)
+    doc.Close()
+    word.Quit()
 
-        # Save the document with cross-references
-        doc.SaveAs(docx_path)
-        doc.Close()
-        word.Quit()
-
-        print(f"Cross-references appended and both Figure 1 and Figure 2 made bold, saved to {docx_path}")
-
-    except Exception as e:
-        print(f"An error occurred: {e}")
-        doc.Close(False)
-        word.Quit()
+    print(f"Cross-references added.")
 
 
 def set_font_formatting(para, word):
@@ -371,7 +357,9 @@ def set_paragraph_spacing(para, word):
     para.Style.NoSpaceBetweenParagraphsOfSameStyle = False
 
 
-def delete_template_bullets(doc, output_doc_file_path):
+def delete_template_bullets(output_doc_file_path):
+    doc = Document(output_doc_file_path)
+
     count = 0
     for para in doc.paragraphs:
         if para.style.name in ["List Bullet", "List Bullet 2", "List Bullet 3"]:
@@ -385,6 +373,7 @@ def delete_template_bullets(doc, output_doc_file_path):
             count += 1
 
     doc.save(output_doc_file_path)
+    print("Template bullets deleted.")
 
 
 def get_images_from_folder(folder_path):
@@ -396,5 +385,7 @@ def get_images_from_folder(folder_path):
     # Loop through each image extension to grab matching files
     for extension in image_extensions:
         image_paths.extend(glob.glob(os.path.join(folder_path, extension)))
+
+    image_paths = sorted(image_paths, key=lambda x: x.lower())
 
     return image_paths

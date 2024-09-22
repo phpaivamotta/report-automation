@@ -10,6 +10,7 @@ from utils import delete_template_bullets
 from utils import get_images_from_folder
 from dotenv import load_dotenv
 import os
+import time
 
 
 
@@ -64,9 +65,8 @@ if __name__ == "__main__":
         # Check if there are any images in the Images folder
         images = get_images_from_folder(images_folder_path)
 
-        print(len(images))
-
         if images:
+            table_counter = 0
             # Loop through images
             for i in range(0, len(images), 2):
                 if i + 1 >= len(images):
@@ -78,7 +78,7 @@ if __name__ == "__main__":
                 num_cols = 2
             
                 # Add create tables and add images to them
-                add_table_with_images(doc, "Inspection Observations:", num_cols, image_path_1, image_path_2)
+                add_table_with_images(doc, "Inspection Observations:", table_counter, num_cols, image_path_1, image_path_2)
 
                 # Save the modified document
                 doc.save(output_doc_file_path)
@@ -86,14 +86,16 @@ if __name__ == "__main__":
                 # Add captions to images
                 add_captions_with_win32com(output_doc_file_path, i, num_cols, image_path_1, image_path_2)
 
-        #         # Add bullets above table
-        #         doc = add_bullets_above_tables(output_doc_file_path)
+                # Add bullets above table
+                doc = add_bullets_above_tables(output_doc_file_path, table_counter, num_cols)   
 
-        #         # Add cross references
-        #         append_cross_references_to_bullets(output_doc_file_path)
+                # Add cross references
+                append_cross_references_to_bullets(output_doc_file_path, i)
 
-        # # Delete the first 3 template bullets (necessary to add bullet styles)
-        # delete_template_bullets(doc, output_doc_file_path)
+                table_counter += 1
+
+        # Delete the first 3 template bullets (necessary to add bullet styles)
+        delete_template_bullets(output_doc_file_path)
 
     else:
         print(f"The template file path {template_file_path} does not exist. Please input a valid file path.")
