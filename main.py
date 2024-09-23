@@ -8,6 +8,8 @@ from utils import add_bullets_above_tables
 from utils import append_cross_references_to_bullets
 from utils import delete_template_bullets
 from utils import get_images_from_folder
+from utils import remove_empty_paragraphs_after_table
+from utils import remove_first_empty_paragraph_above_text
 from dotenv import load_dotenv
 import os
 import time
@@ -82,12 +84,13 @@ if __name__ == "__main__":
 
                 # Save the modified document
                 doc.save(output_doc_file_path)
-
+                
                 # Add captions to images
                 add_captions_with_win32com(output_doc_file_path, i, num_cols, image_path_1, image_path_2)
 
                 # Add bullets above table
-                doc = add_bullets_above_tables(output_doc_file_path, table_counter, num_cols)   
+                doc = add_bullets_above_tables(output_doc_file_path, table_counter, num_cols)
+                # doc.save(output_doc_file_path)
 
                 # Add cross references
                 append_cross_references_to_bullets(output_doc_file_path, i)
@@ -96,6 +99,10 @@ if __name__ == "__main__":
 
         # Delete the first 3 template bullets (necessary to add bullet styles)
         delete_template_bullets(output_doc_file_path)
+
+        remove_empty_paragraphs_after_table(output_doc_file_path)
+
+        remove_first_empty_paragraph_above_text(output_doc_file_path, "Inspection Observations:")
 
     else:
         print(f"The template file path {template_file_path} does not exist. Please input a valid file path.")

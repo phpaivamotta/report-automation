@@ -14,12 +14,30 @@ import glob
 
 def add_table_with_images(doc, header_text, table_counter, num_cols, image_path1, image_path2=None):
 
-    # Find the paragraph with the header text
-    target_paragraph = None
-    for paragraph in doc.paragraphs:
-        if header_text in paragraph.text:
-            target_paragraph = paragraph
-            break
+    if table_counter == 0:
+        # Find the paragraph with the header text
+        target_paragraph = None
+        for paragraph in doc.paragraphs:
+            if header_text in paragraph.text:
+                target_paragraph = paragraph
+                break
+    else:
+        # Find the last table in the document
+        last_table = doc.tables[-1]  # Get the last table
+
+        # Get the last table's XML element
+        tbl_element = last_table._element
+
+        # Create a new paragraph XML element
+        new_paragraph_element = OxmlElement('w:p')
+
+        # Insert the new paragraph right after the last table
+        tbl_element.addnext(new_paragraph_element)
+
+        # Create a paragraph object that we can use programmatically for further insertion
+        target_paragraph = doc.add_paragraph()
+        target_paragraph._element = new_paragraph_element
+
 
     if target_paragraph is None:
         print(f"Header '{header_text}' not found in the document.")
@@ -215,7 +233,7 @@ def set_cell_margins(table, left=0, right=0, top=0, bottom=0):
 
 
 def add_bullets_above_tables(output_doc_file_path, table_counter, num_cols):
-    # Open doc
+
     doc = Document(output_doc_file_path)
 
     # Loop through all tables in the document
@@ -243,10 +261,10 @@ def add_bullets_above_tables(output_doc_file_path, table_counter, num_cols):
 
     # doc.save(output_doc_file_path)
     print(f"Bullets added above all tables except the first")
-
     doc.save(output_doc_file_path)
-
     return doc
+
+    # doc.save(output_doc_file_path)
 
 
 def append_cross_references_to_bullets(docx_path, i):
@@ -358,6 +376,7 @@ def set_paragraph_spacing(para, word):
 
 
 def delete_template_bullets(output_doc_file_path):
+
     doc = Document(output_doc_file_path)
 
     count = 0
@@ -374,6 +393,7 @@ def delete_template_bullets(output_doc_file_path):
 
     doc.save(output_doc_file_path)
     print("Template bullets deleted.")
+    
 
 
 def get_images_from_folder(folder_path):
@@ -389,3 +409,71 @@ def get_images_from_folder(folder_path):
     image_paths = sorted(image_paths, key=lambda x: x.lower())
 
     return image_paths
+
+def delete_paragraph(paragraph):
+    # Access the XML element of the paragraph
+    p = paragraph._element
+    # Access the parent element of the paragraph (usually the document body)
+    p.getparent().remove(p)
+    # Clean up after removing
+    paragraph._element = None
+
+
+def remove_empty_paragraphs_after_table(output_doc_file_path):
+    """
+    This function checks for empty paragraphs after tables and removes them.
+    """
+
+    doc = Document(output_doc_file_path)
+
+    for i, table in enumerate(doc.tables):
+        if i == 0:
+            continue
+        
+        # Get the next element after the table
+        next_element = table._element.getnext()
+
+        # Continue checking for next paragraphs as long as they exist and are paragraphs
+        while next_element is not None and next_element.tag.endswith('p'):
+            # Check if the next element is a paragraph and is effectively empty (strip spaces and non-breaking spaces)
+            paragraph_text = "".join(next_element.itertext()).strip()
+            if not paragraph_text:
+                # If it's an empty paragraph, remove it
+                parent = next_element.getparent()
+                parent.remove(next_element)
+
+                # Get the next element after the removed one
+                next_element = table._element.getnext()
+            else:
+                break  # Exit the loop if the paragraph is not empty
+
+    # Save the document after making modifications
+    doc.save(output_doc_file_path)
+    # return doc
+
+
+def remove_first_empty_paragraph_above_text(output_doc_file_path, text):
+    """
+    Removes the first empty paragraph above the given text in the document.
+    """
+
+    doc = Document(output_doc_file_path)
+
+    # Iterate through paragraphs to find the one containing the target text
+    for i, paragraph in enumerate(doc.paragraphs):
+        if text in paragraph.text:
+            # Check for the preceding paragraph
+            prev_paragraph = paragraph._element.getprevious()
+
+            # If the previous element is an empty paragraph, remove it
+            if prev_paragraph is not None and prev_paragraph.tag.endswith('p'):
+                prev_text = "".join(prev_paragraph.itertext()).strip()
+                if not prev_text:
+                    # Remove the first empty paragraph found
+                    parent = prev_paragraph.getparent()
+                    parent.remove(prev_paragraph)
+                break  # Stop after deleting the first empty paragraph
+            break  # Exit once the target paragraph is found
+
+    doc.save(output_doc_file_path)
+    # return doc
