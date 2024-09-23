@@ -1,136 +1,210 @@
 import os
 import csv
+import logging
 from docx import Document
-from docx.document import Document as _Document
-from docx.oxml.text.paragraph import CT_P
-from docx.oxml.table import CT_Tbl
-from docx.table import _Cell, Table
-from docx.text.paragraph import Paragraph
+from docx.oxml.ns import qn
+from collections import OrderedDict
 
-def iter_block_items(parent):
-    if isinstance(parent, _Document):
-        parent_elm = parent.element.body
-    elif isinstance(parent, _Cell):
-        parent_elm = parent._tc
-    else:
-        raise ValueError("Parent must be a Document or _Cell instance")
-    for child in parent_elm.iterchildren():
-        if isinstance(child, CT_P):
-            yield Paragraph(child, parent)
-        elif isinstance(child, CT_Tbl):
-            yield Table(child, parent)
+# Set up logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-def extract_and_save(docx_path, output_folder):
-    document = Document(docx_path)
-    
-    os.makedirs(output_folder, exist_ok=True)
-    
-    # Define CSV file paths
-    table1_csv_path = os.path.join(output_folder, 'table1_data.csv')
-    data_tables_csv_path = os.path.join(output_folder, 'data_tables.csv')
-    picture_data_csv_path = os.path.join(output_folder, 'picture_data.csv')
-    
-    # Open CSV files
-    with open(table1_csv_path, 'w', newline='', encoding='utf-8') as table1_csvfile, \
-         open(data_tables_csv_path, 'w', newline='', encoding='utf-8') as data_tables_csvfile, \
-         open(picture_data_csv_path, 'w', newline='', encoding='utf-8') as picture_csvfile:
+def get_next_report_id(report_csv_path):
+    """Determines the next available report ID."""
+    try:
+        if not os.path.exists(report_csv_path):
+            return 1
         
-        table1_writer = csv.writer(table1_csvfile)
-        data_tables_writer = csv.writer(data_tables_csvfile)
-        picture_csv_writer = csv.writer(picture_csvfile)
-        
-        # Write headers for each CSV
-        table1_writer.writerow(['Field1', 'Field2'])
-        data_tables_writer.writerow(['Content'])
-        picture_csv_writer.writerow(['Index', 'Description', 'Caption', 'Picture File Name'])
-        
-        image_count = 1
-        table_number = 0
-        
-        for block in iter_block_items(document):
-            if isinstance(block, Table):
-                # Determine the number of columns in the table
-                first_row = block.rows[0]
-                num_columns = len(first_row.cells)
-                
-                if table_number == 0:
-                    # Process the first table (4 columns)
-                    for row in block.rows:
-                        cells = row.cells
-                        if len(cells) == 4:
-                            # Write columns 1 and 2 into Field1 and Field2
-                            field1 = cells[0].text.strip()
-                            field2 = cells[1].text.strip()
-                            table1_writer.writerow([field1, field2])
-                            # Write columns 3 and 4 into Field1 and Field2
-                            field1 = cells[2].text.strip()
-                            field2 = cells[3].text.strip()
-                            table1_writer.writerow([field1, field2])
-                elif num_columns == 1:
-                    # Process one-column tables (like Table 2)
-                    for row in block.rows:
-                        cell_text = row.cells[0].text.strip()
-                        data_tables_writer.writerow([cell_text])
-                elif num_columns == 4:
-                    # Process picture tables
-                    for row in block.rows[1:]:  # Skip header row
-                        cells = row.cells
-                        if len(cells) == 4:
-                            index = cells[0].text.strip()
-                            description = cells[1].text.strip()
-                            caption = cells[2].text.strip()
-                            
-                            # Handle picture
-                            picture_cell = cells[3]
-                            picture_filename = ""
-                            for paragraph in picture_cell.paragraphs:
-                                for run in paragraph.runs:
-                                    # Check if the run contains a drawing (image)
-                                    if 'Drawing' in run._element.xml:
-                                        # Extract the alt-text (description) of the image
-                                        docPr_elements = run._element.xpath('.//wp:docPr')
-                                        if docPr_elements:
-                                            alt_text = docPr_elements[0].get('descr')
-                                            if alt_text:
-                                                # Extract the file name from the file path in alt-text
-                                                file_name = os.path.basename(alt_text)
-                                                picture_filename = file_name
-                                                # Get the image part
-                                                blip = run._element.xpath('.//a:blip')[0]
-                                                embed = blip.get('{http://schemas.openxmlformats.org/officeDocument/2006/relationships}embed')
-                                                image_part = run.part.related_parts[embed]
-                                                
-                                                # Save image using file name
-                                                image_extension = os.path.splitext(image_part.partname)[1]
-                                                # Ensure the file name has the correct extension
-                                                if not file_name.lower().endswith(image_extension.lower()):
-                                                    file_name = os.path.splitext(file_name)[0] + image_extension
-                                                # Add a unique prefix to prevent overwriting files
-                                                image_name = f"{image_count:03d}_{file_name}"
-                                                image_path = os.path.join(output_folder, image_name)
-                                                with open(image_path, 'wb') as f:
-                                                    f.write(image_part.blob)
-                                                
-                                                image_count += 1
-                                                break  # Assume one image per cell
-                                        else:
-                                            print(f"No alt-text found for image at index {index}")
-                                if picture_filename:
-                                    break
-                            
-                            # Write to picture CSV
-                            picture_csv_writer.writerow([index, description, caption, picture_filename])
-                else:
-                    # If the table doesn't match any known format, you can choose to log it or handle it differently
-                    print(f"Unknown table format with {num_columns} columns at table number {table_number + 1}")
-                table_number += 1
-        
-    print(f"Data from the first table extracted and saved to {table1_csv_path}")
-    print(f"Additional data extracted and saved to {data_tables_csv_path}")
-    print(f"Picture data extracted and saved to {picture_data_csv_path}")
-    print(f"Images saved in {output_folder}")
+        with open(report_csv_path, 'r', newline='', encoding='utf-8') as report_csv:
+            reader = csv.DictReader(report_csv)
+            report_ids = [int(row['Report ID']) for row in reader if row['Report ID'].isdigit()]
+            return max(report_ids) + 1 if report_ids else 1
+    except Exception as e:
+        logging.error(f"Error determining next report ID: {str(e)}")
+        raise
 
-# Usage NEEDS DOCM TO BE SAVED AS DOCX
-docx_path = r'C:\Users\dfernandez\OneDrive - Maverick Applied Science\Desktop\ReportInputsTemplate.docx'
-output_folder = 'image_temp'
-extract_and_save(docx_path, output_folder)
+def create_report_folder(base_output_folder, report_id):
+    """Creates a folder for the current report using the report ID."""
+    try:
+        report_folder = os.path.join(base_output_folder, f"report_{report_id:04d}")
+        os.makedirs(report_folder, exist_ok=True)
+        return report_folder
+    except Exception as e:
+        logging.error(f"Error creating report folder: {str(e)}")
+        raise
+
+def extract_report_data(docx_path, report_folder):
+    """Extracts report data and images from the DOCX template."""
+    try:
+        document = Document(docx_path)
+        report_data = {
+            'Customer': '', 'Subject': '', 'Customer Address': '', 'From': '',
+            'Customer Contact': '', 'Company': '', 'Inspection Site': '',
+            'Maverick Contact Info': '', 'Customer PO No.': '', 'Maverick Job': '',
+            'Customer CCs': '', 'Maverick CCs': '', 'Inspection Date(s)': '',
+            'Report Date': '', 'Introduction': '', 'Entrance Meeting': '',
+            'Drawings Used': OrderedDict(), 'Specifications Used': OrderedDict(),
+            'Conclusions': '', 'Pictures': []
+        }
+
+        current_section = None
+        
+        for table in document.tables:
+            for row in table.rows:
+                cells = row.cells
+                if len(cells) == 4:
+                    current_section = process_four_column_row(cells, report_data, current_section)
+                elif len(cells) == 3:
+                    process_picture_row(cells, report_data, report_folder)
+
+        # Convert OrderedDicts back to lists
+        report_data['Drawings Used'] = list(report_data['Drawings Used'].keys())
+        report_data['Specifications Used'] = list(report_data['Specifications Used'].keys())
+
+        return report_data
+    except Exception as e:
+        logging.error(f"Error extracting report data: {str(e)}")
+        raise
+
+def process_four_column_row(cells, report_data, current_section):
+    """Process a row with four columns."""
+    left_descriptor = cells[0].text.strip().rstrip(':')
+    left_value = cells[1].text.strip()
+    right_descriptor = cells[2].text.strip().rstrip(':')
+    right_value = cells[3].text.strip()
+
+    for descriptor, value in [(left_descriptor, left_value), (right_descriptor, right_value)]:
+        if descriptor in report_data and isinstance(report_data[descriptor], str):
+            report_data[descriptor] = value
+
+    if "Drawing" in left_descriptor or "Drawing" in right_descriptor:
+        current_section = 'Drawings Used'
+    elif "Specification" in left_descriptor or "Specification" in right_descriptor:
+        current_section = 'Specifications Used'
+    elif "Conclusions" in left_descriptor or "Conclusions" in right_descriptor:
+        current_section = 'Conclusions'
+        report_data['Conclusions'] = left_value if "Conclusions" in left_descriptor else right_value
+    
+    if current_section == 'Drawings Used':
+        for value in [left_value, right_value]:
+            if value and "Drawing" not in value:
+                report_data[current_section][value] = None
+    elif current_section == 'Specifications Used':
+        for value in [left_value, right_value]:
+            if value and "Specification" not in value:
+                report_data[current_section][value] = None
+
+    return current_section
+
+def process_picture_row(cells, report_data, report_folder):
+    """Process a row containing picture information."""
+    if len(cells) == 3 and cells[0].text.strip() == 'Description' and cells[1].text.strip() == 'Caption' and cells[2].text.strip() == 'Picture':
+        return  # This is the header row, skip it
+
+    description = cells[0].text.strip()
+    caption = cells[1].text.strip()
+    picture_cell = cells[2]
+
+    image_name = extract_and_save_image(picture_cell, report_folder, len(report_data['Pictures']) + 1)
+    if image_name:
+        report_data['Pictures'].append({
+            'Description': description,
+            'Caption': caption,
+            'Picture File Name': image_name
+        })
+
+def extract_and_save_image(picture_cell, report_folder, image_count):
+    """Extract and save an image from a cell."""
+    for paragraph in picture_cell.paragraphs:
+        for run in paragraph.runs:
+            if 'graphicData' in run._element.xml:
+                blip = next((elem for elem in run._element.iter() if elem.tag.endswith('blip')), None)
+                if blip is not None:
+                    try:
+                        embed = blip.get(qn('r:embed'))
+                        image_part = run.part.related_parts[embed]
+                        image_extension = os.path.splitext(image_part.partname)[1]
+                        image_name = f"image_{image_count:03d}{image_extension}"
+                        image_path = os.path.join(report_folder, image_name)
+                        
+                        with open(image_path, 'wb') as f:
+                            f.write(image_part.blob)
+                        
+                        logging.info(f"Saved image: {image_name}")
+                        return image_name
+                    except Exception as e:
+                        logging.error(f"Error saving image: {str(e)}")
+    return None
+
+def append_to_csv(report_data, report_id, report_csv_path, picture_csv_path, report_folder):
+    """Appends report and picture data to the corresponding CSV files."""
+    try:
+        # Append report data
+        with open(report_csv_path, 'a', newline='', encoding='utf-8') as report_csv:
+            writer = csv.writer(report_csv)
+            if os.path.getsize(report_csv_path) == 0:  # Write header if the file is empty
+                writer.writerow(['Report ID', 'Customer', 'Subject', 'Customer Address', 'From', 
+                                 'Customer Contact', 'Company', 'Inspection Site', 'Maverick Contact Info', 
+                                 'Customer PO No.', 'Maverick Job', 'Customer CCs', 'Maverick CCs', 
+                                 'Inspection Date(s)', 'Report Date', 'Introduction', 'Entrance Meeting', 
+                                 'Drawings Used', 'Specifications Used', 'Conclusions', 'Report Folder'])
+            
+            drawings = '; '.join(report_data['Drawings Used'])
+            specifications = '; '.join(report_data['Specifications Used'])
+            
+            writer.writerow([report_id, report_data['Customer'], report_data['Subject'], 
+                             report_data['Customer Address'], report_data['From'], 
+                             report_data['Customer Contact'], report_data['Company'], 
+                             report_data['Inspection Site'], report_data['Maverick Contact Info'], 
+                             report_data['Customer PO No.'], report_data['Maverick Job'], 
+                             report_data['Customer CCs'], report_data['Maverick CCs'], 
+                             report_data['Inspection Date(s)'], report_data['Report Date'], 
+                             report_data['Introduction'], report_data['Entrance Meeting'], 
+                             drawings, specifications, report_data['Conclusions'],
+                             os.path.basename(report_folder)])
+
+        # Append picture data
+        with open(picture_csv_path, 'a', newline='', encoding='utf-8') as picture_csv:
+            writer = csv.writer(picture_csv)
+            if os.path.getsize(picture_csv_path) == 0:  # Write header if the file is empty
+                writer.writerow(['Picture ID', 'Report ID', 'Description', 'Caption', 'Picture File Name', 'Report Folder'])
+            
+            for index, picture in enumerate(report_data['Pictures'], start=1):
+                writer.writerow([f"{report_id}_{index}", report_id, picture['Description'], 
+                                 picture['Caption'], picture['Picture File Name'], os.path.basename(report_folder)])
+
+        logging.info(f"Data successfully written to CSV files.")
+    except Exception as e:
+        logging.error(f"Error writing to CSV files: {str(e)}")
+        raise
+
+def main():
+    try:
+        base_output_folder = r'C:\Users\drewb\Downloads\Maverick Repo\report-automation\ExampleExtractedData'
+        docx_path = r'C:\Users\drewb\Downloads\Maverick Repo\report-automation\ReportInputsTemplate.docx'
+        report_csv_path = os.path.join(base_output_folder, 'report_info.csv')
+        picture_csv_path = os.path.join(base_output_folder, 'picture_info.csv')
+
+        # Check if input file exists
+        if not os.path.exists(docx_path):
+            raise FileNotFoundError(f"Input DOCX file not found: {docx_path}")
+
+        # Get the next report ID
+        report_id = get_next_report_id(report_csv_path)
+
+        # Create a folder for this report using the report ID
+        report_folder = create_report_folder(base_output_folder, report_id)
+
+        # Extract and append data
+        report_data = extract_report_data(docx_path, report_folder)
+        append_to_csv(report_data, report_id, report_csv_path, picture_csv_path, report_folder)
+
+        logging.info(f"Report data extracted and saved. Images stored in: {report_folder}")
+    except FileNotFoundError as e:
+        logging.error(f"File not found: {str(e)}")
+    except PermissionError:
+        logging.error("Permission denied. Make sure you have the necessary permissions to read/write files.")
+    except Exception as e:
+        logging.error(f"An unexpected error occurred: {str(e)}")
+
+if __name__ == "__main__":
+    main()
