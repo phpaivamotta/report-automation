@@ -118,7 +118,7 @@ def replace_text_in_table(table, old_texts, new_texts):
     print("Project details in Table 1 were modified successfully.")
 
 
-def add_captions_with_win32com(doc_path, i, num_cols, image_path1, image_path2=None):
+def add_captions_with_win32com(doc_path, i, num_cols, image_path1, image_path2=None, caption1=None, caption2=None):
     # Open Word application
     word = win32.Dispatch('Word.Application')
     word.Visible = True  # Set to True if you want to see Word while working
@@ -130,38 +130,29 @@ def add_captions_with_win32com(doc_path, i, num_cols, image_path1, image_path2=N
     # for i, inline_shape in enumerate(doc.InlineShapes):
     
     if num_cols == 1:
-        # Get image file name
-        file_name = os.path.basename(image_path1)
-        file_name = ". " + file_name
         # Select the inline shape (image)
         doc.InlineShapes(i+1).Select() # The InlineShape() method is 1-based indexed
-        # Insert a caption for the selected image (exclude custom title, only label + number)
-        word.Selection.InsertCaption(Label="Figure", Title=file_name, ExcludeLabel=False, Position=-1)
+        # Insert a caption for the selected image
+        word.Selection.InsertCaption(Label="Figure", Title=f": {caption1}", Position=-1)
         # Move the selection to the end of the caption
         word.Selection.MoveRight(Unit=2, Count=1, Extend=1)
         # Delete any text after the caption label (if any text remains after "Figure X")
         word.Selection.TypeBackspace()
 
     elif num_cols ==  2:
-        # Get image file name
-        file_name = os.path.basename(image_path1)
-        file_name = ". " + file_name
         # Select the inline shape (image)
         doc.InlineShapes(i+1).Select() # The InlineShape() method is 1-based indexed
-        # Insert a caption for the selected image (exclude custom title, only label + number)
-        word.Selection.InsertCaption(Label="Figure", Title=file_name, ExcludeLabel=False, Position=-1)
+        # Insert a caption for the selected image
+        word.Selection.InsertCaption(Label="Figure", Title=f": {caption1}", Position=-1)
         # Move the selection to the end of the caption
         word.Selection.MoveRight(Unit=2, Count=1, Extend=1)
         # Delete any text after the caption label (if any text remains after "Figure X")
         word.Selection.TypeBackspace()
 
-        # Get image file name
-        file_name = os.path.basename(image_path2)
-        file_name = ". " + file_name
         # Select the inline shape (image)
         doc.InlineShapes(i+2).Select() # The InlineShape() method is 1-based indexed
         # Insert a caption for the selected image (exclude custom title, only label + number)
-        word.Selection.InsertCaption(Label="Figure", Title=file_name, ExcludeLabel=False, Position=-1)
+        word.Selection.InsertCaption(Label="Figure", Title=f": {caption2}", Position=-1)
         # Move the selection to the end of the caption
         word.Selection.MoveRight(Unit=2, Count=1, Extend=1)
         # Delete any text after the caption label (if any text remains after "Figure X")
@@ -272,7 +263,7 @@ def add_bullets_above_tables(output_doc_file_path, table_counter, num_cols):
     # doc.save(output_doc_file_path)
 
 
-def append_cross_references_to_bullets(docx_path, i):
+def append_cross_references_to_bullets(docx_path, i, num_cols, description1, description2=None):
     """Append cross-references to the beginning of each bullet point and make Figure 1 and Figure 2 bold."""
     # Open Word application
     word = win32.Dispatch('Word.Application')
@@ -335,6 +326,12 @@ def append_cross_references_to_bullets(docx_path, i):
 
             word.Selection.TypeText("shows ")  # Add a space before the original text
 
+            # Remove "Figure shows " from the beginning of the description if present
+            if description1.startswith("Figure shows "):
+                description1 = description1[13:]
+
+            word.Selection.TypeText(description1)  # Add description
+
             # Move the selection to the end of the caption
             word.Selection.MoveRight(Unit=1, Count=14, Extend=1) #Bullet point 1
 
@@ -392,6 +389,12 @@ def append_cross_references_to_bullets(docx_path, i):
             word.Selection.Font.Bold = False
 
             word.Selection.TypeText("shows ")  # Add a space before the original text
+
+            # Remove "Figure shows " from the beginning of the description if present
+            if description2.startswith("Figure shows "):
+                description2 = description2[13:]
+
+            word.Selection.TypeText(description2)  # Add description
 
             # Move the selection to the end of the caption
             word.Selection.MoveRight(Unit=1, Count=14, Extend=1) #Bullet point 1

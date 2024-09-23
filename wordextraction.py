@@ -4,6 +4,7 @@ import logging
 from docx import Document
 from docx.oxml.ns import qn
 from collections import OrderedDict
+from dotenv import load_dotenv
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -178,33 +179,26 @@ def append_to_csv(report_data, report_id, report_csv_path, picture_csv_path, rep
         raise
 
 def main():
-    try:
-        base_output_folder = r'C:\Users\drewb\Downloads\Maverick Repo\report-automation\ExampleExtractedData'
-        docx_path = r'C:\Users\drewb\Downloads\Maverick Repo\report-automation\ReportInputsTemplate.docx'
-        report_csv_path = os.path.join(base_output_folder, 'report_info.csv')
-        picture_csv_path = os.path.join(base_output_folder, 'picture_info.csv')
+    # Use environment variables
+    load_dotenv(override=True)
+    base_output_folder = os.getenv('EXTRACTED_DATA_PATH')
+    docx_path = os.getenv('INPUT_DOC_PATH')
+    report_csv_path = os.path.join(base_output_folder, 'report_info.csv')
+    picture_csv_path = os.path.join(base_output_folder, 'picture_info.csv')
 
-        # Check if input file exists
-        if not os.path.exists(docx_path):
-            raise FileNotFoundError(f"Input DOCX file not found: {docx_path}")
+    # Check if input file exists
+    if not os.path.exists(docx_path):
+        raise FileNotFoundError(f"Input DOCX file not found: {docx_path}")
 
-        # Get the next report ID
-        report_id = get_next_report_id(report_csv_path)
+    # Get the next report ID
+    report_id = get_next_report_id(report_csv_path)
 
-        # Create a folder for this report using the report ID
-        report_folder = create_report_folder(base_output_folder, report_id)
+    # Create a folder for this report using the report ID
+    report_folder = create_report_folder(base_output_folder, report_id)
 
-        # Extract and append data
-        report_data = extract_report_data(docx_path, report_folder)
-        append_to_csv(report_data, report_id, report_csv_path, picture_csv_path, report_folder)
-
-        logging.info(f"Report data extracted and saved. Images stored in: {report_folder}")
-    except FileNotFoundError as e:
-        logging.error(f"File not found: {str(e)}")
-    except PermissionError:
-        logging.error("Permission denied. Make sure you have the necessary permissions to read/write files.")
-    except Exception as e:
-        logging.error(f"An unexpected error occurred: {str(e)}")
+    # Extract and append data
+    report_data = extract_report_data(docx_path, report_folder)
+    append_to_csv(report_data, report_id, report_csv_path, picture_csv_path, report_folder)
 
 if __name__ == "__main__":
     main()
