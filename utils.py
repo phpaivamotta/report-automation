@@ -12,7 +12,9 @@ import glob
 
 
 
-def add_table_with_images(doc, header_text, table_counter, num_cols, image_path1, image_path2=None):
+def add_table_with_images(output_doc_file_path, header_text, table_counter, num_cols, image_path1, image_path2=None):
+
+    doc = Document(output_doc_file_path) #Don't pass in python-docx object, wincom library likes paths
 
     if table_counter == 0:
         # Find the paragraph with the header text
@@ -91,6 +93,9 @@ def add_table_with_images(doc, header_text, table_counter, num_cols, image_path1
         run = paragraph.add_run()
         run.add_picture(image_path2, width=Inches(3.6))  # Adjust width as needed
 
+    # Save document to path
+    doc.save(output_doc_file_path)
+
     print("Table with images were added successfully.")
 
 
@@ -120,7 +125,7 @@ def add_captions_with_win32com(doc_path, i, num_cols, image_path1, image_path2=N
 
     # Open the existing document
     doc = word.Documents.Open(doc_path)
-
+    time.sleep(5)
     # Loop through all inline shapes (images) in the document
     # for i, inline_shape in enumerate(doc.InlineShapes):
     
@@ -275,7 +280,7 @@ def append_cross_references_to_bullets(docx_path, i):
 
     # Open the existing document
     doc = word.Documents.Open(docx_path)
-
+    time.sleep(5)
     # Set the figure references for bullet 1 and bullet 2
     figure_1_ref = i + 1  # Reference to Figure 1
     figure_2_ref = i + 2  # Reference to Figure 2
@@ -356,6 +361,7 @@ def append_cross_references_to_bullets(docx_path, i):
 
     # Save the document with cross-references
     doc.SaveAs(docx_path)
+    doc.Save()
     doc.Close()
     word.Quit()
 

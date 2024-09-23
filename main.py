@@ -49,11 +49,13 @@ if __name__ == "__main__":
     # Check if file path exists
     if os.path.exists(template_file_path):
 
-        # Open an existing document
-        doc = Document(template_file_path)
+        # Open an existing document and save new
+        template_doc = Document(template_file_path)
+        template_doc.save(output_doc_file_path) # Save template to new location
+        working_doc = Document(output_doc_file_path) # Open new file in the new location
 
         # Modify core properties
-        core_properties = doc.core_properties
+        core_properties = working_doc.core_properties
         # Set core properties
         core_properties.title = doc_core_properties["title"]
         core_properties.author = doc_core_properties["author"]
@@ -61,11 +63,14 @@ if __name__ == "__main__":
         core_properties.keywords = doc_core_properties["keywords"]
 
         # Iterate through all tables (if any)
-        for table in doc.tables:
+        for table in working_doc.tables:
             replace_text_in_table(table, custom_properties.keys(), custom_properties.values())
 
         # Check if there are any images in the Images folder
         images = get_images_from_folder(images_folder_path)
+
+        # Before running, make sure to save working doc
+        working_doc.save(output_doc_file_path)
 
         if images:
             table_counter = 0
@@ -80,17 +85,14 @@ if __name__ == "__main__":
                 num_cols = 2
             
                 # Add create tables and add images to them
-                add_table_with_images(doc, "Inspection Observations:", table_counter, num_cols, image_path_1, image_path_2)
-
-                # Save the modified document
-                doc.save(output_doc_file_path)
+                add_table_with_images(output_doc_file_path, "Inspection Observations:", table_counter, num_cols, image_path_1, image_path_2)
                 
                 # Add captions to images
                 add_captions_with_win32com(output_doc_file_path, i, num_cols, image_path_1, image_path_2)
 
                 # Add bullets above table
-                doc = add_bullets_above_tables(output_doc_file_path, table_counter, num_cols)
-                # doc.save(output_doc_file_path)
+                testdoc = add_bullets_above_tables(output_doc_file_path, table_counter, num_cols)
+                testdoc.save(output_doc_file_path)
 
                 # Add cross references
                 append_cross_references_to_bullets(output_doc_file_path, i)
