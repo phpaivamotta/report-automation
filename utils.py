@@ -197,19 +197,18 @@ def add_bullets_above_tables(output_doc_file_path):
             # Insert the bullet points before the table
             paragraph_before_table.addnext(bullet_2._element)
             bullet_2._element.addprevious(bullet_1._element)
-            # Insert an empty paragraph (for space) after the bullets
-            empty_space = doc.add_paragraph("")
-            bullet_2._element.addnext(empty_space._element)
 
-    doc.save(output_doc_file_path)
+    # doc.save(output_doc_file_path)
     print(f"Bullets added above all tables except the first")
+
+    return doc
 
 
 def append_cross_references_to_bullets(docx_path):
     """Append cross-references to the beginning of each bullet point and make Figure 1 and Figure 2 bold."""
     # Open Word application
     word = win32.Dispatch('Word.Application')
-    word.Visible = True  # Set to True if you want to see Word while working
+    word.Visible = False  # Set to True if you want to see Word while working
 
     # Open the existing document
     doc = word.Documents.Open(docx_path)
@@ -269,6 +268,8 @@ def append_cross_references_to_bullets(docx_path):
 
                 set_font_formatting(para, word)
 
+                set_paragraph_spacing(para, word)
+
             elif para.Range.Text.strip() == "Bullet point 2":
                 # Move the cursor to the beginning of the paragraph and insert the cross-reference for Figure 2
                 word.Selection.SetRange(para.Range.Start, para.Range.Start)
@@ -303,6 +304,8 @@ def append_cross_references_to_bullets(docx_path):
 
                 set_font_formatting(para, word)
 
+                set_paragraph_spacing(para, word)
+
         # Save the document with cross-references
         doc.SaveAs(docx_path)
         doc.Close()
@@ -321,3 +324,25 @@ def set_font_formatting(para, word):
     # Apply the font to the whole range of the paragraph
     para.Range.Font.Name = 'Calibri (Body)'
     para.Range.Font.Size = 12
+
+def set_paragraph_spacing(para, word):
+    word.Selection.SetRange(para.Range.Start, para.Range.End)
+    word.Selection.ParagraphFormat.SpaceBefore = 6
+    word.Selection.ParagraphFormat.SpaceAfter = 6
+    para.Style.NoSpaceBetweenParagraphsOfSameStyle = False
+
+
+def delete_template_bullets(doc, output_doc_file_path):
+    count = 0
+    for para in doc.paragraphs:
+        if para.style.name in ["List Bullet", "List Bullet 2", "List Bullet 3"]:
+            if count >= 3:
+                break
+            # Remove the paragraph from the parent element (body)
+            p = para._element
+            p.getparent().remove(p)
+            # Clean up after removing
+            p._element = p = None
+            count += 1
+
+    doc.save(output_doc_file_path)
