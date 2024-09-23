@@ -125,7 +125,7 @@ def add_captions_with_win32com(doc_path, i, num_cols, image_path1, image_path2=N
 
     # Open the existing document
     doc = word.Documents.Open(doc_path)
-    time.sleep(5)
+    
     # Loop through all inline shapes (images) in the document
     # for i, inline_shape in enumerate(doc.InlineShapes):
     
@@ -280,7 +280,7 @@ def append_cross_references_to_bullets(docx_path, i):
 
     # Open the existing document
     doc = word.Documents.Open(docx_path)
-    time.sleep(5)
+
     # Set the figure references for bullet 1 and bullet 2
     figure_1_ref = i + 1  # Reference to Figure 1
     figure_2_ref = i + 2  # Reference to Figure 2
@@ -290,6 +290,10 @@ def append_cross_references_to_bullets(docx_path, i):
         if para.Range.Text.strip() == "Bullet point 1":
             # Move the cursor to the beginning of the paragraph and insert the cross-reference for Figure 1
             word.Selection.SetRange(para.Range.Start, para.Range.Start)
+            
+            # Record the start position before inserting the cross-reference
+            start_pos = word.Selection.Start
+
             word.Selection.InsertCrossReference(
                 ReferenceType="Figure",
                 ReferenceKind=3,  # 3 corresponds to wdOnlyLabelAndNumber (Figure X)
@@ -299,6 +303,24 @@ def append_cross_references_to_bullets(docx_path, i):
                 SeparateNumbers=False,
                 SeparatorString=" "
             )
+
+            # Record the end position after inserting the cross-reference
+            end_pos = word.Selection.Start
+
+            # Modify the field code to include \* Charformat
+            field_range = doc.Range(Start=start_pos, End=end_pos)
+            if field_range.Fields.Count > 0:
+                field = field_range.Fields(1)
+                field_code = field.Code.Text
+                if "\\* Charformat" not in field_code:
+                    # Ensure there's a space before appending the switch
+                    if not field_code.rstrip().endswith(" "):
+                        field_code = field_code.rstrip() + " "
+                    field_code = field_code.rstrip() + "\\*Charformat "
+                    field.Code.Text = field_code
+                field.Update()
+            else:
+                print("No field found in the range.")
 
             # Bold the inserted Figure 1 text
             word.Selection.MoveLeft(Unit=1, Count=1, Extend=True)  # 1 = wdCharacter
@@ -326,6 +348,10 @@ def append_cross_references_to_bullets(docx_path, i):
         elif para.Range.Text.strip() == "Bullet point 2":
             # Move the cursor to the beginning of the paragraph and insert the cross-reference for Figure 2
             word.Selection.SetRange(para.Range.Start, para.Range.Start)
+
+            #Record the start position before inserting the cross-reference
+            start_pos = word.Selection.Start
+
             word.Selection.InsertCrossReference(
                 ReferenceType="Figure",
                 ReferenceKind=3,  # 3 corresponds to wdOnlyLabelAndNumber (Figure X)
@@ -335,6 +361,24 @@ def append_cross_references_to_bullets(docx_path, i):
                 SeparateNumbers=False,
                 SeparatorString=" "
             )
+
+            # Record the end position after inserting the cross-reference
+            end_pos = word.Selection.Start
+
+            # Modify the field code to include \* Charformat
+            field_range = doc.Range(Start=start_pos, End=end_pos)
+            if field_range.Fields.Count > 0:
+                field = field_range.Fields(1)
+                field_code = field.Code.Text
+                if "\\* Charformat" not in field_code:
+                    # Ensure there's a space before appending the switch
+                    if not field_code.rstrip().endswith(" "):
+                        field_code = field_code.rstrip() + " "
+                    field_code = field_code.rstrip() + "\\*Charformat "
+                    field.Code.Text = field_code
+                field.Update()
+            else:
+                print("No field found in the range.")
 
             # Bold the inserted Figure 2 text
             word.Selection.MoveLeft(Unit=1, Count=1, Extend=True)  # 1 = wdCharacter
