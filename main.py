@@ -75,13 +75,16 @@ if __name__ == "__main__":
             table_counter = 0
             # Loop through images
             for i in range(0, len(images), 2):
+                
                 if i + 1 >= len(images):
                     image_path_1 = images[i]
                     num_cols = 1
-                    break
-                image_path_1 = images[i]
-                image_path_2 = images[i+1]
-                num_cols = 2
+                else:
+                    image_path_1 = images[i]
+                    image_path_2 = images[i+1]
+                    num_cols = 2
+
+            
             
                 # Add create tables and add images to them
                 add_table_with_images(output_doc_file_path, "Inspection Observations:", table_counter, num_cols, image_path_1, image_path_2)
@@ -100,6 +103,7 @@ if __name__ == "__main__":
                 append_cross_references_to_bullets(output_doc_file_path, i)
 
                 table_counter += 1
+                print(table_counter)
 
         # Delete the first 3 template bullets (necessary to add bullet styles)
         delete_template_bullets(output_doc_file_path)
