@@ -13,6 +13,7 @@ from utils import remove_first_empty_paragraph_above_text
 from dotenv import load_dotenv
 import os
 import time
+import win32com.client as win32
 
 
 
@@ -52,6 +53,7 @@ if __name__ == "__main__":
         # Open an existing document
         doc = Document(template_file_path)
 
+
         # Modify core properties
         core_properties = doc.core_properties
         # Set core properties
@@ -63,6 +65,8 @@ if __name__ == "__main__":
         # Iterate through all tables (if any)
         for table in doc.tables:
             replace_text_in_table(table, custom_properties.keys(), custom_properties.values())
+
+        doc.save(output_doc_file_path)
 
         # Check if there are any images in the Images folder
         images = get_images_from_folder(images_folder_path)
@@ -80,16 +84,16 @@ if __name__ == "__main__":
                 num_cols = 2
             
                 # Add create tables and add images to them
-                add_table_with_images(doc, "Inspection Observations:", table_counter, num_cols, image_path_1, image_path_2)
+                add_table_with_images(output_doc_file_path, "Inspection Observations:", table_counter, num_cols, image_path_1, image_path_2)
 
                 # Save the modified document
-                doc.save(output_doc_file_path)
+                # doc.save(output_doc_file_path)
                 
                 # Add captions to images
                 add_captions_with_win32com(output_doc_file_path, i, num_cols, image_path_1, image_path_2)
 
                 # Add bullets above table
-                doc = add_bullets_above_tables(output_doc_file_path, table_counter, num_cols)
+                add_bullets_above_tables(output_doc_file_path, table_counter, num_cols)
                 # doc.save(output_doc_file_path)
 
                 # Add cross references

@@ -12,7 +12,9 @@ import glob
 
 
 
-def add_table_with_images(doc, header_text, table_counter, num_cols, image_path1, image_path2=None):
+def add_table_with_images(output_doc_file_path, header_text, table_counter, num_cols, image_path1, image_path2=None):
+
+    doc = Document(output_doc_file_path)
 
     if table_counter == 0:
         # Find the paragraph with the header text
@@ -91,6 +93,7 @@ def add_table_with_images(doc, header_text, table_counter, num_cols, image_path1
         run = paragraph.add_run()
         run.add_picture(image_path2, width=Inches(3.6))  # Adjust width as needed
 
+    doc.save(output_doc_file_path)
     print("Table with images were added successfully.")
 
 
@@ -116,7 +119,7 @@ def replace_text_in_table(table, old_texts, new_texts):
 def add_captions_with_win32com(doc_path, i, num_cols, image_path1, image_path2=None):
     # Open Word application
     word = win32.Dispatch('Word.Application')
-    word.Visible = True  # Set to True if you want to see Word while working
+    word.Visible = False  # Set to True if you want to see Word while working
 
     # Open the existing document
     doc = word.Documents.Open(doc_path)
@@ -163,10 +166,11 @@ def add_captions_with_win32com(doc_path, i, num_cols, image_path1, image_path2=N
         word.Selection.TypeBackspace()
 
     # Update all fields (important for cross-references)
-    doc.Fields.Update()
-
+    # doc.Fields.Update()
+    # time.sleep(5)
     # Save and close the document
-    doc.Save()
+    doc.SaveAs(doc_path)
+    # doc.Save()
     doc.Close()
     word.Quit()
 
@@ -262,7 +266,7 @@ def add_bullets_above_tables(output_doc_file_path, table_counter, num_cols):
     # doc.save(output_doc_file_path)
     print(f"Bullets added above all tables except the first")
     doc.save(output_doc_file_path)
-    return doc
+    # return doc
 
     # doc.save(output_doc_file_path)
 
@@ -271,7 +275,7 @@ def append_cross_references_to_bullets(docx_path, i):
     """Append cross-references to the beginning of each bullet point and make Figure 1 and Figure 2 bold."""
     # Open Word application
     word = win32.Dispatch('Word.Application')
-    word.Visible = True  # Set to True if you want to see Word while working
+    word.Visible = False  # Set to True if you want to see Word while working
 
     # Open the existing document
     doc = word.Documents.Open(docx_path)
@@ -353,7 +357,8 @@ def append_cross_references_to_bullets(docx_path, i):
             set_font_formatting(para, word)
 
             set_paragraph_spacing(para, word)
-
+            
+    # time.sleep(5)
     # Save the document with cross-references
     doc.SaveAs(docx_path)
     doc.Close()
