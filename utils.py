@@ -3,6 +3,7 @@ from docx.shared import Inches
 from docx.shared import Pt
 import win32com.client as win32
 from docx.enum.table import WD_TABLE_ALIGNMENT
+from docx.enum.text import WD_BREAK
 from docx.oxml import OxmlElement, parse_xml
 from docx.oxml.ns import nsdecls
 from docx.oxml.ns import qn
@@ -482,3 +483,36 @@ def remove_first_empty_paragraph_above_text(output_doc_file_path, text):
 
     doc.save(output_doc_file_path)
     # return doc
+
+def add_page_break_below_table(output_doc_file_path):
+    doc = Document(output_doc_file_path)
+    
+    for i, table in enumerate(doc.tables):
+        if i == 0:
+            continue
+
+        if i % 2 == 0:
+            # # Get the last table's XML element
+            # tbl_element = table._element
+
+            # # Create a new paragraph XML element
+            # new_paragraph_element = OxmlElement('w:p')
+
+            # # Insert the new paragraph right after the last table
+            # tbl_element.addnext(new_paragraph_element)
+
+            # # Insert a page break after the new paragraph
+            # new_paragraph_element.add_run().add_break(WD_BREAK.PAGE)
+            # Get the last table's XML element
+            tbl_element = table._element
+
+            # Create a new paragraph below the table
+            new_paragraph = doc.add_paragraph()
+
+            # Insert the paragraph after the table in the XML tree
+            tbl_element.addnext(new_paragraph._element)
+
+            # Insert a page break after the new paragraph
+            new_paragraph.add_run().add_break(WD_BREAK.PAGE)
+
+    doc.save(output_doc_file_path)

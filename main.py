@@ -10,6 +10,7 @@ from utils import delete_template_bullets
 from utils import get_images_from_folder
 from utils import remove_empty_paragraphs_after_table
 from utils import remove_first_empty_paragraph_above_text
+from utils import add_page_break_below_table
 from dotenv import load_dotenv
 import os
 import time
@@ -103,7 +104,6 @@ if __name__ == "__main__":
                 append_cross_references_to_bullets(output_doc_file_path, i)
 
                 table_counter += 1
-                print(table_counter)
 
         # Delete the first 3 template bullets (necessary to add bullet styles)
         delete_template_bullets(output_doc_file_path)
@@ -111,6 +111,9 @@ if __name__ == "__main__":
         remove_empty_paragraphs_after_table(output_doc_file_path)
 
         remove_first_empty_paragraph_above_text(output_doc_file_path, "Inspection Observations:")
+
+        # Add paragraph and page break above second table inserted to page
+        add_page_break_below_table(output_doc_file_path)
 
     else:
         print(f"The template file path {template_file_path} does not exist. Please input a valid file path.")
