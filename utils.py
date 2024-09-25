@@ -3,6 +3,7 @@ from docx.shared import Inches
 from docx.shared import Pt
 import win32com.client as win32
 from docx.enum.table import WD_TABLE_ALIGNMENT
+from docx.enum.text import WD_BREAK
 from docx.oxml import OxmlElement, parse_xml
 from docx.oxml.ns import nsdecls
 from docx.oxml.ns import qn
@@ -123,7 +124,7 @@ def replace_text_in_table(table, old_texts, new_texts):
 def add_captions_with_win32com(doc_path, i, num_cols, image_path1, image_path2=None, caption1=None, caption2=None):
     # Open Word application
     word = win32.Dispatch('Word.Application')
-    word.Visible = True  # Set to True if you want to see Word while working
+    word.Visible = False  # Set to True if you want to see Word while working
 
     # Open the existing document
     doc = word.Documents.Open(doc_path)
@@ -161,10 +162,11 @@ def add_captions_with_win32com(doc_path, i, num_cols, image_path1, image_path2=N
         word.Selection.TypeBackspace()
 
     # Update all fields (important for cross-references)
-    doc.Fields.Update()
-
+    # doc.Fields.Update()
+    # time.sleep(5)
     # Save and close the document
-    doc.Save()
+    doc.SaveAs(doc_path)
+    # doc.Save()
     doc.Close()
     word.Quit()
 
@@ -260,7 +262,7 @@ def add_bullets_above_tables(output_doc_file_path, table_counter, num_cols):
     # doc.save(output_doc_file_path)
     print(f"Bullets added above all tables except the first")
     doc.save(output_doc_file_path)
-    return doc
+    # return doc
 
     # doc.save(output_doc_file_path)
 
@@ -269,7 +271,7 @@ def append_cross_references_to_bullets(docx_path, i, num_cols, description1, des
     """Append cross-references to the beginning of each bullet point and make Figure 1 and Figure 2 bold."""
     # Open Word application
     word = win32.Dispatch('Word.Application')
-    word.Visible = True  # Set to True if you want to see Word while working
+    word.Visible = False  # Set to True if you want to see Word while working
 
     # Open the existing document
     doc = word.Documents.Open(docx_path)
@@ -407,7 +409,8 @@ def append_cross_references_to_bullets(docx_path, i, num_cols, description1, des
             set_font_formatting(para, word)
 
             set_paragraph_spacing(para, word)
-
+            
+    # time.sleep(5)
     # Save the document with cross-references
     doc.SaveAs(docx_path)
     doc.Save()
@@ -533,6 +536,39 @@ def remove_first_empty_paragraph_above_text(output_doc_file_path, text):
     doc.save(output_doc_file_path)
     # return doc
 
+def add_page_break_below_table(output_doc_file_path):
+    doc = Document(output_doc_file_path)
+    
+    for i, table in enumerate(doc.tables):
+        if i == 0:
+            continue
+
+        if i % 2 == 0:
+            # # Get the last table's XML element
+            # tbl_element = table._element
+
+            # # Create a new paragraph XML element
+            # new_paragraph_element = OxmlElement('w:p')
+
+            # # Insert the new paragraph right after the last table
+            # tbl_element.addnext(new_paragraph_element)
+
+            # # Insert a page break after the new paragraph
+            # new_paragraph_element.add_run().add_break(WD_BREAK.PAGE)
+            # Get the last table's XML element
+            tbl_element = table._element
+
+            # Create a new paragraph below the table
+            new_paragraph = doc.add_paragraph()
+
+            # Insert the paragraph after the table in the XML tree
+            tbl_element.addnext(new_paragraph._element)
+
+            # Insert a page break after the new paragraph
+            new_paragraph.add_run().add_break(WD_BREAK.PAGE)
+
+    doc.save(output_doc_file_path)
+    
 def insert_formatted_text_after_header(docx_path, header_text, content_to_insert):
     """
     Finds a header text in the document and inserts formatted content below it.

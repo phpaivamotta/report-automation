@@ -12,6 +12,7 @@ from utils import delete_template_bullets
 from utils import get_images_from_folder
 from utils import remove_empty_paragraphs_after_table
 from utils import remove_first_empty_paragraph_above_text
+from utils import add_page_break_below_table
 from utils import insert_formatted_text_after_header
 from utils import read_report_data
 from utils import read_picture_data
@@ -25,6 +26,9 @@ from wordextraction import append_to_csv
 from dotenv import load_dotenv
 import os
 import time
+import win32com.client as win32
+
+
 
 # Load environment variables from .env file
 load_dotenv(override=True)
@@ -212,6 +216,9 @@ if __name__ == "__main__":
             remove_first_empty_paragraph_above_text(output_doc_file_path, "Inspection Observations:")
             
             print(f"Report generated successfully: {output_file_name}")
+
+            # Add paragraph and page break above second table inserted to page
+            add_page_break_below_table(output_doc_file_path)
 
         else:
             print(f"The template file path {template_file_path} does not exist. Please input a valid file path.")
