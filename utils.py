@@ -6,6 +6,8 @@ from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.oxml import OxmlElement, parse_xml
 from docx.oxml.ns import nsdecls
 from docx.oxml.ns import qn
+from copy import deepcopy
+import csv
 import time
 import os
 import glob
@@ -530,3 +532,116 @@ def remove_first_empty_paragraph_above_text(output_doc_file_path, text):
 
     doc.save(output_doc_file_path)
     # return doc
+
+def insert_formatted_text_after_header(docx_path, header_text, content_to_insert):
+    """
+    Finds a header text in the document and inserts formatted content below it.
+    
+    :param docx_path: Path to the Word document
+    :param header_text: The header text to search for
+    :param content_to_insert: The content to insert after the header
+    """
+    # Use python-docx to find the header and insert content
+    doc = Document(docx_path)
+    
+    target_paragraph = None
+    for paragraph in doc.paragraphs:
+        if header_text in paragraph.text:
+            target_paragraph = paragraph
+            break
+    
+    if target_paragraph:
+        # Insert new paragraph after the target
+        new_paragraph = doc.add_paragraph()
+        target_paragraph._p.addnext(new_paragraph._p)
+        new_paragraph.text = content_to_insert
+        
+        # Save the document
+        doc.save(docx_path)
+
+        # Now use win32com for formatting
+        word = win32.Dispatch('Word.Application')
+        word.Visible = False
+        
+        doc = word.Documents.Open(docx_path)
+    
+        # Find the newly inserted paragraph
+        for para in doc.Paragraphs:
+            if content_to_insert in para.Range.Text:
+                set_font_formatting(para, word)
+                set_paragraph_spacing(para, word)
+                break
+        
+        # Save and close
+        doc.Save()
+        doc.Close()
+        word.Quit()
+
+        print(f"Formatted text inserted after '{header_text}'.")
+    else:
+        print(f"Header '{header_text}' not found in the document.")
+
+def read_report_data(report_csv_path, report_id):
+    with open(report_csv_path, 'r', newline='', encoding='utf-8') as report_csv:
+        reader = csv.DictReader(report_csv)
+        for row in reader:
+            if int(row['Report ID']) == report_id:
+                return row
+    return None
+
+def read_picture_data(picture_csv_path, report_id):
+    pictures = []
+    with open(picture_csv_path, 'r', newline='', encoding='utf-8') as picture_csv:
+        reader = csv.DictReader(picture_csv)
+        for row in reader:
+            if int(row['Report ID']) == report_id:
+                pictures.append(row)
+    return pictures
+
+
+def add_formatted_bullets(output_doc_file_path, header_text, new_content_list):
+    doc = Document(output_doc_file_path)
+
+    # Find the paragraph containing the header text
+    target_paragraph = None
+    for i, paragraph in enumerate(doc.paragraphs):
+        if header_text in paragraph.text:
+            target_paragraph = paragraph
+            target_index = i
+            break
+
+    if target_paragraph and target_index + 1 < len(doc.paragraphs):
+        # The template bullet is always the next paragraph after the header
+        template_bullet = doc.paragraphs[target_index + 1]
+
+        # Create new bullets, building from bottom up
+        new_bullets = []
+        for new_content in reversed(new_content_list):
+            # Deep copy the template bullet
+            new_bullet = deepcopy(template_bullet._element)
+            
+            # Create a new paragraph object from the copied element
+            new_para = type(template_bullet)(new_bullet, template_bullet._parent)
+            
+            # Set the text of the new paragraph
+            new_para.text = new_content
+            
+            new_bullets.append(new_para)
+
+        # Insert the new bullets after the template bullet
+        for new_bullet in reversed(new_bullets):
+            template_bullet._element.addnext(new_bullet._element)
+
+    else:
+        print(f"Header text '{header_text}' not found or it's the last paragraph in the document.")
+
+    doc.save(output_doc_file_path)
+    return doc
+
+# Example usage:
+# new_drawings = ["Equipment Drawing: New Equipment 1", "Equipment Drawing: New Equipment 2"]
+# add_formatted_bullets(
+#     output_doc_file_path,
+#     "The following drawings were provided and used during the inspection:",
+#     new_drawings
+# )

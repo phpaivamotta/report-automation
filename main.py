@@ -3,6 +3,7 @@ from docx.opc.coreprops import CoreProperties
 from docx.shared import Inches
 from utils import add_table_with_images
 from utils import replace_text_in_table
+from utils import add_formatted_bullets
 from utils import add_captions_with_win32com
 from utils import add_bullets_above_tables
 from utils import append_cross_references_to_bullets
@@ -10,6 +11,9 @@ from utils import delete_template_bullets
 from utils import get_images_from_folder
 from utils import remove_empty_paragraphs_after_table
 from utils import remove_first_empty_paragraph_above_text
+from utils import insert_formatted_text_after_header
+from utils import read_report_data
+from utils import read_picture_data
 from wordextraction import get_next_report_id
 from wordextraction import create_report_folder
 from wordextraction import extract_report_data
@@ -20,7 +24,6 @@ from wordextraction import append_to_csv
 from dotenv import load_dotenv
 import os
 import time
-import csv
 
 # Load environment variables from .env file
 load_dotenv(override=True)
@@ -50,23 +53,6 @@ custom_properties = {
     "maverick ccs": "maverick ccs",
     "report date": "report date",
 }
-
-def read_report_data(report_csv_path, report_id):
-    with open(report_csv_path, 'r', newline='', encoding='utf-8') as report_csv:
-        reader = csv.DictReader(report_csv)
-        for row in reader:
-            if int(row['Report ID']) == report_id:
-                return row
-    return None
-
-def read_picture_data(picture_csv_path, report_id):
-    pictures = []
-    with open(picture_csv_path, 'r', newline='', encoding='utf-8') as picture_csv:
-        reader = csv.DictReader(picture_csv)
-        for row in reader:
-            if int(row['Report ID']) == report_id:
-                pictures.append(row)
-    return pictures
 
 if __name__ == "__main__":
 
@@ -113,11 +99,11 @@ if __name__ == "__main__":
             core_properties.author = report_data['From']
             core_properties.subject = report_data['Subject']
             core_properties.keywords = report_data['Maverick Job']
+            core_properties.comments = report_data['Customer Contact']
 
             # Update custom properties
             custom_properties = {
                 "customer address": report_data['Customer Address'],
-                "customer contact": report_data['Customer Contact'],
                 "inspection site": report_data['Inspection Site'],
                 "customer po num": report_data['Customer PO No.'],
                 "customer ccs": report_data['Customer CCs'],
@@ -128,56 +114,72 @@ if __name__ == "__main__":
                 "report date": report_data['Report Date'],
             }
 
+            working_doc.save(output_doc_file_path)
+
             # Iterate through all tables (if any)
             for table in working_doc.tables:
                 replace_text_in_table(table, custom_properties.keys(), custom_properties.values())
 
+            working_doc.save(output_doc_file_path)
+
+            #Insert Introduction
+            insert_formatted_text_after_header(output_doc_file_path, "Introduction", report_data['Introduction'])
+
+            #Insert Conclusion
+            insert_formatted_text_after_header(output_doc_file_path, "Inspection Conclusions and Recommendations", report_data['Conclusions'])
+
+            #Add Drawings
+            add_formatted_bullets(output_doc_file_path, "The following drawings were provided and used during the inspection:", ["New Drawing 1"])
+
+            #Reopen document after using win32com
+            working_doc = Document(output_doc_file_path)
+    
             # Before running, make sure to save working doc
             working_doc.save(output_doc_file_path)
 
-            if picture_data:
-                # Construct the path to the report's image folder
-                report_folder = os.path.join(extracted_data_path, f"report_{report_id:04d}")
-                table_counter = 0
-                for i in range(0, len(picture_data), 2):
-                    image_1 = picture_data[i]
-                    image_path_1 = os.path.join(report_folder, image_1['Picture File Name'])
-                    description_1 = image_1['Description']
-                    caption_1 = image_1['Caption']
+            # if picture_data:
+            #     # Construct the path to the report's image folder
+            #     report_folder = os.path.join(extracted_data_path, f"report_{report_id:04d}")
+            #     table_counter = 0
+            #     for i in range(0, len(picture_data), 2):
+            #         image_1 = picture_data[i]
+            #         image_path_1 = os.path.join(report_folder, image_1['Picture File Name'])
+            #         description_1 = image_1['Description']
+            #         caption_1 = image_1['Caption']
                     
-                    if i + 1 < len(picture_data):
-                        image_2 = picture_data[i+1]
-                        image_path_2 = os.path.join(report_folder, image_2['Picture File Name'])
-                        description_2 = image_2['Description']
-                        caption_2 = image_2['Caption']
-                        num_cols = 2
-                    else:
-                        image_path_2 = None
-                        description_2 = None
-                        caption_2 = None
-                        num_cols = 1
+            #         if i + 1 < len(picture_data):
+            #             image_2 = picture_data[i+1]
+            #             image_path_2 = os.path.join(report_folder, image_2['Picture File Name'])
+            #             description_2 = image_2['Description']
+            #             caption_2 = image_2['Caption']
+            #             num_cols = 2
+            #         else:
+            #             image_path_2 = None
+            #             description_2 = None
+            #             caption_2 = None
+            #             num_cols = 1
                     
-                    # Add create tables and add images to them
-                    add_table_with_images(output_doc_file_path, "Inspection Observations:", table_counter, num_cols, image_path_1, image_path_2)
+            #         # Add create tables and add images to them
+            #         add_table_with_images(output_doc_file_path, "Inspection Observations:", table_counter, num_cols, image_path_1, image_path_2)
                     
-                    # Add captions to images
-                    add_captions_with_win32com(output_doc_file_path, i, num_cols, image_path_1, image_path_2, caption_1, caption_2)
+            #         # Add captions to images
+            #         add_captions_with_win32com(output_doc_file_path, i, num_cols, image_path_1, image_path_2, caption_1, caption_2)
 
-                    # Add bullets above table with descriptions
-                    add_bullets_above_tables(output_doc_file_path, table_counter, num_cols)
+            #         # Add bullets above table with descriptions
+            #         add_bullets_above_tables(output_doc_file_path, table_counter, num_cols)
 
-                    # Add cross references
-                    append_cross_references_to_bullets(output_doc_file_path, i, num_cols, description_1, description_2)
+            #         # Add cross references
+            #         append_cross_references_to_bullets(output_doc_file_path, i, num_cols, description_1, description_2)
 
-                    table_counter += 1
-
-            # Delete the first 3 template bullets (necessary to add bullet styles)
-            delete_template_bullets(output_doc_file_path)
-
-            remove_empty_paragraphs_after_table(output_doc_file_path)
-
-            remove_first_empty_paragraph_above_text(output_doc_file_path, "Inspection Observations:")
-
+            #         table_counter += 1
+        
+            # # Delete the first 3 template bullets (necessary to add bullet styles) dont need this anymore????? It breaks if I leave it in?????
+            # #delete_template_bullets(output_doc_file_path)
+            
+            # remove_empty_paragraphs_after_table(output_doc_file_path)
+            
+            # remove_first_empty_paragraph_above_text(output_doc_file_path, "Inspection Observations:")
+            
             print(f"Report generated successfully: {output_file_name}")
 
         else:
