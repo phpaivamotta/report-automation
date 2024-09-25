@@ -177,28 +177,55 @@ def append_to_csv(report_data, report_id, report_csv_path, picture_csv_path, rep
     except Exception as e:
         logging.error(f"Error writing to CSV files: {str(e)}")
         raise
+    
+def process_input(input_path):
+    """
+    Process either a single file or all .docx files in a folder.
+    """
+    if os.path.isfile(input_path):
+        process_single_file(input_path)
+    elif os.path.isdir(input_path):
+        for filename in os.listdir(input_path):
+            if filename.endswith('.docx'):
+                file_path = os.path.join(input_path, filename)
+                process_single_file(file_path)
+    else:
+        logging.error(f"Invalid input path: {input_path}")
+
+def process_single_file(file_path):
+    """
+    Process a single input file.
+    """
+    try:
+        # Get the next report ID
+        report_csv_path = os.path.join(base_output_folder, 'report_info.csv')
+        picture_csv_path = os.path.join(base_output_folder, 'picture_info.csv')
+        report_id = get_next_report_id(report_csv_path)
+
+        # Create a folder for this report
+        report_folder = create_report_folder(base_output_folder, report_id)
+
+        # Extract and append data
+        report_data = extract_report_data(file_path, report_folder)
+        append_to_csv(report_data, report_id, report_csv_path, picture_csv_path, report_folder)
+
+        logging.info(f"Processed file: {file_path}")
+    except Exception as e:
+        logging.error(f"Error processing file {file_path}: {str(e)}")
 
 def main():
     # Use environment variables
     load_dotenv(override=True)
+    global base_output_folder
     base_output_folder = os.getenv('EXTRACTED_DATA_PATH')
-    docx_path = os.getenv('INPUT_DOC_PATH')
-    report_csv_path = os.path.join(base_output_folder, 'report_info.csv')
-    picture_csv_path = os.path.join(base_output_folder, 'picture_info.csv')
+    input_path = os.getenv('INPUT_DOC_PATH')
 
-    # Check if input file exists
-    if not os.path.exists(docx_path):
-        raise FileNotFoundError(f"Input DOCX file not found: {docx_path}")
+    # Check if input path exists
+    if not os.path.exists(input_path):
+        raise FileNotFoundError(f"Input path not found: {input_path}")
 
-    # Get the next report ID
-    report_id = get_next_report_id(report_csv_path)
-
-    # Create a folder for this report using the report ID
-    report_folder = create_report_folder(base_output_folder, report_id)
-
-    # Extract and append data
-    report_data = extract_report_data(docx_path, report_folder)
-    append_to_csv(report_data, report_id, report_csv_path, picture_csv_path, report_folder)
+    # Process input (either single file or folder)
+    process_input(input_path)
 
 if __name__ == "__main__":
     main()
