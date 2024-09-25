@@ -7,6 +7,7 @@ from utils import add_formatted_bullets
 from utils import add_captions_with_win32com
 from utils import add_bullets_above_tables
 from utils import append_cross_references_to_bullets
+from utils import format_paragraphs_with_win32com
 from utils import delete_template_bullets
 from utils import get_images_from_folder
 from utils import remove_empty_paragraphs_after_table
@@ -128,8 +129,38 @@ if __name__ == "__main__":
             #Insert Conclusion
             insert_formatted_text_after_header(output_doc_file_path, "Inspection Conclusions and Recommendations", report_data['Conclusions'])
 
-            #Add Drawings
-            add_formatted_bullets(output_doc_file_path, "The following drawings were provided and used during the inspection:", ["New Drawing 1"])
+            # Split the drawings and specifications strings into lists
+            drawings = report_data['Drawings Used'].split('; ')
+            specifications = report_data['Specifications Used'].split('; ')
+
+            # Add formatted bullets for drawings
+            add_formatted_bullets(
+                output_doc_file_path,
+                "The following drawings were provided and used during the inspection:",
+                drawings,
+                is_drawing=True
+            )
+
+            # Add formatted bullets for specifications
+            add_formatted_bullets(
+                output_doc_file_path,
+                "The following specifications were used during the inspection:",
+                specifications,
+                is_drawing=False
+            )
+
+            # After adding the bullets
+            format_paragraphs_with_win32com(
+                output_doc_file_path,
+                "The following drawings were provided and used during the inspection:",
+                "The following specifications were used during the inspection:"
+            )
+
+            format_paragraphs_with_win32com(
+                output_doc_file_path,
+                "The following specifications were used during the inspection:",
+                "Inspection Observations:"
+            )
 
             #Reopen document after using win32com
             working_doc = Document(output_doc_file_path)
@@ -137,48 +168,48 @@ if __name__ == "__main__":
             # Before running, make sure to save working doc
             working_doc.save(output_doc_file_path)
 
-            # if picture_data:
-            #     # Construct the path to the report's image folder
-            #     report_folder = os.path.join(extracted_data_path, f"report_{report_id:04d}")
-            #     table_counter = 0
-            #     for i in range(0, len(picture_data), 2):
-            #         image_1 = picture_data[i]
-            #         image_path_1 = os.path.join(report_folder, image_1['Picture File Name'])
-            #         description_1 = image_1['Description']
-            #         caption_1 = image_1['Caption']
+            if picture_data:
+                # Construct the path to the report's image folder
+                report_folder = os.path.join(extracted_data_path, f"report_{report_id:04d}")
+                table_counter = 0
+                for i in range(0, len(picture_data), 2):
+                    image_1 = picture_data[i]
+                    image_path_1 = os.path.join(report_folder, image_1['Picture File Name'])
+                    description_1 = image_1['Description']
+                    caption_1 = image_1['Caption']
                     
-            #         if i + 1 < len(picture_data):
-            #             image_2 = picture_data[i+1]
-            #             image_path_2 = os.path.join(report_folder, image_2['Picture File Name'])
-            #             description_2 = image_2['Description']
-            #             caption_2 = image_2['Caption']
-            #             num_cols = 2
-            #         else:
-            #             image_path_2 = None
-            #             description_2 = None
-            #             caption_2 = None
-            #             num_cols = 1
+                    if i + 1 < len(picture_data):
+                        image_2 = picture_data[i+1]
+                        image_path_2 = os.path.join(report_folder, image_2['Picture File Name'])
+                        description_2 = image_2['Description']
+                        caption_2 = image_2['Caption']
+                        num_cols = 2
+                    else:
+                        image_path_2 = None
+                        description_2 = None
+                        caption_2 = None
+                        num_cols = 1
                     
-            #         # Add create tables and add images to them
-            #         add_table_with_images(output_doc_file_path, "Inspection Observations:", table_counter, num_cols, image_path_1, image_path_2)
+                    # Add create tables and add images to them
+                    add_table_with_images(output_doc_file_path, "Inspection Observations:", table_counter, num_cols, image_path_1, image_path_2)
                     
-            #         # Add captions to images
-            #         add_captions_with_win32com(output_doc_file_path, i, num_cols, image_path_1, image_path_2, caption_1, caption_2)
+                    # Add captions to images
+                    add_captions_with_win32com(output_doc_file_path, i, num_cols, image_path_1, image_path_2, caption_1, caption_2)
 
-            #         # Add bullets above table with descriptions
-            #         add_bullets_above_tables(output_doc_file_path, table_counter, num_cols)
+                    # Add bullets above table with descriptions
+                    add_bullets_above_tables(output_doc_file_path, table_counter, num_cols)
 
-            #         # Add cross references
-            #         append_cross_references_to_bullets(output_doc_file_path, i, num_cols, description_1, description_2)
+                    # Add cross references
+                    append_cross_references_to_bullets(output_doc_file_path, i, num_cols, description_1, description_2)
 
-            #         table_counter += 1
+                    table_counter += 1
         
-            # # Delete the first 3 template bullets (necessary to add bullet styles) dont need this anymore????? It breaks if I leave it in?????
-            # #delete_template_bullets(output_doc_file_path)
+            # Delete the first 3 template bullets (necessary to add bullet styles) dont need this anymore????? It breaks if I leave it in?????
+            #delete_template_bullets(output_doc_file_path)
             
-            # remove_empty_paragraphs_after_table(output_doc_file_path)
+            remove_empty_paragraphs_after_table(output_doc_file_path)
             
-            # remove_first_empty_paragraph_above_text(output_doc_file_path, "Inspection Observations:")
+            remove_first_empty_paragraph_above_text(output_doc_file_path, "Inspection Observations:")
             
             print(f"Report generated successfully: {output_file_name}")
 

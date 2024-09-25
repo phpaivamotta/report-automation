@@ -599,7 +599,7 @@ def read_picture_data(picture_csv_path, report_id):
     return pictures
 
 
-def add_formatted_bullets(output_doc_file_path, header_text, new_content_list):
+def add_formatted_bullets(output_doc_file_path, header_text, new_content_list, is_drawing=True):
     doc = Document(output_doc_file_path)
 
     # Find the paragraph containing the header text
@@ -623,14 +623,21 @@ def add_formatted_bullets(output_doc_file_path, header_text, new_content_list):
             # Create a new paragraph object from the copied element
             new_para = type(template_bullet)(new_bullet, template_bullet._parent)
             
+            # Prepare the text content
+            if is_drawing and not new_content.startswith("Equipment Drawing:"):
+                new_content = f"Equipment Drawing: {new_content}"
+
             # Set the text of the new paragraph
             new_para.text = new_content
-            
+
             new_bullets.append(new_para)
 
         # Insert the new bullets after the template bullet
-        for new_bullet in reversed(new_bullets):
+        for new_bullet in new_bullets:
             template_bullet._element.addnext(new_bullet._element)
+
+        # Remove the original template bullet if requested
+        template_bullet._element.getparent().remove(template_bullet._element)
 
     else:
         print(f"Header text '{header_text}' not found or it's the last paragraph in the document.")
@@ -639,9 +646,49 @@ def add_formatted_bullets(output_doc_file_path, header_text, new_content_list):
     return doc
 
 # Example usage:
-# new_drawings = ["Equipment Drawing: New Equipment 1", "Equipment Drawing: New Equipment 2"]
+# new_drawings = ["New Equipment 1", "New Equipment 2"]
 # add_formatted_bullets(
 #     output_doc_file_path,
 #     "The following drawings were provided and used during the inspection:",
-#     new_drawings
+#     new_drawings,
+#     is_drawing=True
 # )
+
+# new_specs = ["New Spec 1", "New Spec 2"]
+# add_formatted_bullets(
+#     output_doc_file_path,
+#     "The following specifications were used during the inspection:",
+#     new_specs,
+#     is_drawing=False
+# )
+
+def format_paragraphs_with_win32com(docx_path, start_target_text, end_target_text):
+    # Open Word application
+    word = win32.Dispatch('Word.Application')
+    word.Visible = False  # Set to True if you want to see Word while working
+
+    try:
+        # Open the existing document
+        doc = word.Documents.Open(docx_path)
+
+        formatting_active = False
+        for para in doc.Paragraphs:
+            if start_target_text in para.Range.Text:
+                formatting_active = True
+                continue
+            
+            if formatting_active:
+                if end_target_text in para.Range.Text:
+                    break  # Stop formatting when we reach the end target text
+                
+                # Apply formatting
+                set_font_formatting(para, word)
+                set_paragraph_spacing(para, word)
+
+        # Save and close
+        doc.Save()
+        doc.Close()
+
+    finally:
+        # Quit Word application
+        word.Quit()
