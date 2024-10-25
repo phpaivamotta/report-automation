@@ -104,6 +104,7 @@ def add_table_with_images(output_doc_file_path, header_text, table_counter, num_
 
 def replace_text_in_paragraph(paragraph, old_texts, new_texts):
     for old_text, new_text in zip(old_texts, new_texts):
+        print(paragraph.text)
         if old_text in paragraph.text:
             paragraph.text = paragraph.text.replace(old_text, new_text)
 
@@ -680,23 +681,6 @@ def add_formatted_bullets(output_doc_file_path, header_text, new_content_list, i
 
     doc.save(output_doc_file_path)
     return doc
-
-# Example usage:
-# new_drawings = ["New Equipment 1", "New Equipment 2"]
-# add_formatted_bullets(
-#     output_doc_file_path,
-#     "The following drawings were provided and used during the inspection:",
-#     new_drawings,
-#     is_drawing=True
-# )
-
-# new_specs = ["New Spec 1", "New Spec 2"]
-# add_formatted_bullets(
-#     output_doc_file_path,
-#     "The following specifications were used during the inspection:",
-#     new_specs,
-#     is_drawing=False
-# )
 
 def format_paragraphs_with_win32com(docx_path, start_target_text, end_target_text):
     # Open Word application

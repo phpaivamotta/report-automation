@@ -109,10 +109,10 @@ if __name__ == "__main__":
             # Update custom properties
             custom_properties = {
                 "customer address": report_data['Customer Address'],
-                "inspection site": report_data['Inspection Site'],
+                "Inspection site": report_data['Inspection Site'],
                 "customer po num": report_data['Customer PO No.'],
                 "customer ccs": report_data['Customer CCs'],
-                "inspection date": report_data['Inspection Date(s)'],
+                "Inspection date": report_data['Inspection Date(s)'],
                 "company": report_data['Company'],
                 "maverick contact info": report_data['Maverick Contact Info'],
                 "maverick ccs": report_data['Maverick CCs'],

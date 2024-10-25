@@ -1,3 +1,6 @@
 Picture ID,Report ID,Description,Caption,Picture File Name,Report Folder
 1_1,1,Figure shows big tank with steel supports in the foreground.,Up-close image of outside of tank or large pipe.,image_001.jpeg,report_0001
-1_2,1,Figure shows unknown material leaking from pipe nozzle or similar connection.,Connection with unknown material.,image_002.jpeg,report_0001
+1_2,1,Unknown material leaking from pipe nozzle or similar connection.,Connection with unknown material.,image_002.jpeg,report_0001
+1_3,1,Corroded tank grounding lug,Tank 8383 grounding lug,image_003.jpeg,report_0001
+1_4,1,Delamination of tank,Tank so and so delamination,image_004.jpeg,report_0001
+1_5,1,Delamination of train B,Tank so and so train B delamination,image_005.jpeg,report_0001

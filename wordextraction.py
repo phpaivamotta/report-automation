@@ -52,11 +52,16 @@ def extract_report_data(docx_path, report_folder):
         for table in document.tables:
             for row in table.rows:
                 cells = row.cells
+                # PM Comment:
+                # Not sure how this works, only the first 7 rows in the first table have 4 columns, 
+                # but all rows on first table are being processed as if they had four columns?
+                # Last existing cell value in the row seems to be repeated in the other "non-existing" cells.
                 if len(cells) == 4:
                     current_section = process_four_column_row(cells, report_data, current_section)
                 elif len(cells) == 3:
                     process_picture_row(cells, report_data, report_folder)
 
+        # PM Comment: only reason why dictionary needs to be converted back to a list is because processing of columns is buggy.
         # Convert OrderedDicts back to lists
         report_data['Drawings Used'] = list(report_data['Drawings Used'].keys())
         report_data['Specifications Used'] = list(report_data['Specifications Used'].keys())
@@ -68,6 +73,12 @@ def extract_report_data(docx_path, report_folder):
 
 def process_four_column_row(cells, report_data, current_section):
     """Process a row with four columns."""
+    # PM Comment:
+    # This function is a mess bruv bruv...
+
+    # PM Comment:
+    # This code is fine for the rows that actually have four columns, but it should be adjusted for columns with just two columns.
+    # I don't know why program is identifying 4 rows when there are only 2.
     left_descriptor = cells[0].text.strip().rstrip(':')
     left_value = cells[1].text.strip()
     right_descriptor = cells[2].text.strip().rstrip(':')
@@ -86,13 +97,15 @@ def process_four_column_row(cells, report_data, current_section):
         report_data['Conclusions'] = left_value if "Conclusions" in left_descriptor else right_value
     
     if current_section == 'Drawings Used':
+        # PM Comment: both 'left_value' and 'right_value' are the same, since there is only one column in the row
+        # and last existing value is repeated into other columns if other columns are empty.
         for value in [left_value, right_value]:
-            if value and "Drawing" not in value:
-                report_data[current_section][value] = None
-    elif current_section == 'Specifications Used':
+            if value and "Drawing" not in value: # PM Comment: What if the drawing document has 'Drawing' in its title?
+                report_data[current_section][value] = None # PM Comment: the only reason a dictionary is being used is because you can override the repeated value. You avoid duplicates this way.
+    elif current_section == 'Specifications Used': 
         for value in [left_value, right_value]:
-            if value and "Specification" not in value:
-                report_data[current_section][value] = None
+            if value and "Specification" not in value: # PM Comment: What if the specification document has 'Specification' in its title?
+                report_data[current_section][value] = None # PM Comment: the only reason a dictionary is being used is because you can override the repeated value. You avoid duplicates this way.
 
     return current_section
 
