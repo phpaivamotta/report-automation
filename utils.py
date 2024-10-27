@@ -14,7 +14,6 @@ import os
 import glob
 
 
-
 def add_table_with_images(output_doc_file_path, header_text, table_counter, num_cols, image_path1, image_path2=None):
 
     doc = Document(output_doc_file_path) #Don't pass in python-docx object, wincom library likes paths
@@ -712,3 +711,40 @@ def format_paragraphs_with_win32com(docx_path, start_target_text, end_target_tex
     finally:
         # Quit Word application
         word.Quit()
+
+def update_document_properties(doc_path, report_data):
+    # Open Word application
+    word = win32.Dispatch("Word.Application")
+
+    # Open the document (provide the full path to the document)
+    doc = word.Documents.Open(doc_path)
+
+    # Access core (built-in) properties
+    core_props = doc.BuiltInDocumentProperties
+
+    # Access and modify core properties
+    core_props("Title").Value = report_data['Customer']
+    core_props("Author").Value = report_data['From']
+    core_props("Subject").Value = report_data['Subject']
+    core_props("Keywords").Value = report_data['Maverick Job']
+
+    # Access custom properties
+    custom_props = doc.CustomDocumentProperties
+
+    # Access and modify custom properties
+    custom_props("customer address").Value = report_data['Customer Address']
+    custom_props("inspection site").Value = report_data['Inspection Site']
+    custom_props("customer po num").Value = report_data['Customer PO No.']
+    custom_props("customer ccs").Value = report_data['Customer CCs']
+    custom_props("inspection date").Value = report_data['Inspection Date(s)']
+    custom_props("maverick ccs").Value = report_data['Maverick CCs']
+    custom_props("report date").Value = report_data['Report Date']
+    custom_props("customer contacts").Value = report_data['Customer Contact']
+    # custom_props("author title").Value = "O Foda"
+    # custom_props("maverick contact info cell").Value = "696-2424-420"
+    # custom_props("maverick contact info email").Value = "myemail@gmail.com"
+
+    # Close the document and quit Word
+    doc.Save()
+    doc.Close()
+    word.Quit()

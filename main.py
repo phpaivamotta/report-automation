@@ -1,6 +1,12 @@
+from dotenv import load_dotenv
+import os
+import time
+import win32com.client as win32
+
 from docx import Document
 from docx.opc.coreprops import CoreProperties
 from docx.shared import Inches
+
 from utils import add_table_with_images
 from utils import replace_text_in_table
 from utils import add_formatted_bullets
@@ -16,6 +22,8 @@ from utils import add_page_break_below_table
 from utils import insert_formatted_text_after_header
 from utils import read_report_data
 from utils import read_picture_data
+from utils import update_document_properties
+
 from wordextraction import get_next_report_id
 from wordextraction import create_report_folder
 from wordextraction import extract_report_data
@@ -23,44 +31,19 @@ from wordextraction import process_four_column_row
 from wordextraction import process_picture_row
 from wordextraction import extract_and_save_image
 from wordextraction import append_to_csv
-from dotenv import load_dotenv
-import os
-import time
-import win32com.client as win32
 
 
-
-# Load environment variables from .env file
-load_dotenv(override=True)
-template_file_path = os.getenv('TEMPLATE_DOC_PATH')
-output_folder_path = os.getenv('OUTPUT_REPORT_FOLDER_PATH')
-extracted_data_path = os.getenv('EXTRACTED_DATA_PATH')
-input_doc_file_path = os.getenv('INPUT_DOC_PATH')
-
-# Core document properties inputs
-doc_core_properties = {
-    "title": "Title", # customer
-    "author": "author", # from
-    "subject": "subject", #
-    "keywords": "keywords", # maverick job num
-}
-
-# Custom document properties inputs
-custom_properties = {
-    "customer address": "customer address",
-    "customer contact": "customer contact",
-    "inspection site": "inspection site",
-    "customer po num": "customer po num",
-    "customer ccs": "customer css",
-    "inspection date": "inspection date",
-    "company": "company",
-    "maverick contact info": "maverick contact info",
-    "maverick ccs": "maverick ccs",
-    "report date": "report date",
-}
 
 if __name__ == "__main__":
 
+    # Load environment variables from .env file
+    load_dotenv(override=True)
+    template_file_path = os.getenv('TEMPLATE_DOC_PATH')
+    output_folder_path = os.getenv('OUTPUT_REPORT_FOLDER_PATH')
+    extracted_data_path = os.getenv('EXTRACTED_DATA_PATH')
+    input_doc_file_path = os.getenv('INPUT_DOC_PATH')
+
+    # Get .csv info from Input Form
     report_csv_path = os.path.join(extracted_data_path, 'report_info.csv')
     picture_csv_path = os.path.join(extracted_data_path, 'picture_info.csv')
 
@@ -95,40 +78,15 @@ if __name__ == "__main__":
             # Open an existing document and save new
             template_doc = Document(template_file_path)
             template_doc.save(output_doc_file_path) # Save template to new location
-            working_doc = Document(output_doc_file_path) # Open new file in the new location
 
-            # Modify core properties
-            core_properties = working_doc.core_properties
-            # Set core properties
-            core_properties.title = report_data['Customer']
-            core_properties.author = report_data['From']
-            core_properties.subject = report_data['Subject']
-            core_properties.keywords = report_data['Maverick Job']
-            core_properties.comments = report_data['Customer Contact']
-
-            # Update custom properties
-            custom_properties = {
-                "customer address": report_data['Customer Address'],
-                "Inspection site": report_data['Inspection Site'],
-                "customer po num": report_data['Customer PO No.'],
-                "customer ccs": report_data['Customer CCs'],
-                "Inspection date": report_data['Inspection Date(s)'],
-                "company": report_data['Company'],
-                "maverick contact info": report_data['Maverick Contact Info'],
-                "maverick ccs": report_data['Maverick CCs'],
-                "report date": report_data['Report Date'],
-            }
-
-            working_doc.save(output_doc_file_path)
-
-            # Iterate through all tables (if any)
-            for table in working_doc.tables:
-                replace_text_in_table(table, custom_properties.keys(), custom_properties.values())
-
-            working_doc.save(output_doc_file_path)
+            # Update Word Document properties (first table)
+            update_document_properties(output_doc_file_path, report_data)
 
             #Insert Introduction
             insert_formatted_text_after_header(output_doc_file_path, "Introduction", report_data['Introduction'])
+
+            #Insert Entrance Meeting
+            insert_formatted_text_after_header(output_doc_file_path, "Entrance Meeting", report_data['Entrance Meeting'])
 
             #Insert Conclusion
             insert_formatted_text_after_header(output_doc_file_path, "Inspection Conclusions and Recommendations", report_data['Conclusions'])
