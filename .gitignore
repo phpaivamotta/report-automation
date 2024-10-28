@@ -1,6 +1,13 @@
 .venv
 __pycache__/
 .env
-Output Report/
-Reports Extracted Data/
-Report Input Forms/
+
+# Ignore contents of folders but keep the folders themselves
+Output Report/*
+!Output Report/.gitkeep
+
+Reports Extracted Data/*
+!Reports Extracted Data/.gitkeep
+
+Report Input Forms/*
+!Report Input Forms/.gitkeep
