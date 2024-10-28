@@ -2,4 +2,5 @@
 __pycache__/
 .env
 Output Report/
-ExampleExtractedData/
+Reports Extracted Data/
+Report Input Forms/

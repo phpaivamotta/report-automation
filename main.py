@@ -1,21 +1,14 @@
 from dotenv import load_dotenv
 import os
 import time
-import win32com.client as win32
-
 from docx import Document
-from docx.opc.coreprops import CoreProperties
-from docx.shared import Inches
 
 from utils import add_table_with_images
-from utils import replace_text_in_table
 from utils import add_formatted_bullets
 from utils import add_captions_with_win32com
 from utils import add_bullets_above_tables
 from utils import append_cross_references_to_bullets
 from utils import format_paragraphs_with_win32com
-from utils import delete_template_bullets
-from utils import get_images_from_folder
 from utils import remove_empty_paragraphs_after_table
 from utils import remove_first_empty_paragraph_above_text
 from utils import add_page_break_below_table
@@ -25,13 +18,6 @@ from utils import read_picture_data
 from utils import update_document_properties
 
 from wordextraction import get_next_report_id
-from wordextraction import create_report_folder
-from wordextraction import extract_report_data
-from wordextraction import process_four_column_row
-from wordextraction import process_picture_row
-from wordextraction import extract_and_save_image
-from wordextraction import append_to_csv
-
 
 
 if __name__ == "__main__":
@@ -63,6 +49,7 @@ if __name__ == "__main__":
 
     # Read report data
     report_data = read_report_data(report_csv_path, report_id)
+
     if not report_data:
         print(f"No data found for report ID {report_id}")
     else:
@@ -134,7 +121,9 @@ if __name__ == "__main__":
                 # Construct the path to the report's image folder
                 report_folder = os.path.join(extracted_data_path, f"report_{report_id:04d}")
                 table_counter = 0
+
                 for i in range(0, len(picture_data), 2):
+
                     image_1 = picture_data[i]
                     image_path_1 = os.path.join(report_folder, image_1['Picture File Name'])
                     description_1 = image_1['Description']
@@ -165,9 +154,6 @@ if __name__ == "__main__":
                     append_cross_references_to_bullets(output_doc_file_path, i, num_cols, description_1, description_2)
 
                     table_counter += 1
-        
-            # Delete the first 3 template bullets (necessary to add bullet styles) dont need this anymore????? It breaks if I leave it in?????
-            #delete_template_bullets(output_doc_file_path)
             
             remove_empty_paragraphs_after_table(output_doc_file_path)
             
