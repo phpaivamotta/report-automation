@@ -4,7 +4,6 @@ Automates the generation of professional Word inspection reports for Maverick Ap
 
 ## Requirements
 
-- Windows with Microsoft Word installed
 - Python 3.x
 - Dependencies: `pip install -r requirements.txt`
 
@@ -82,10 +81,7 @@ report-automation/
 
 ## How It Works
 
-The system uses two Python libraries with complementary roles:
-
-- **python-docx** — structural edits: inserting text sections, bullet lists, and image tables into the document XML.
-- **win32com** (Word COM automation) — advanced formatting that python-docx cannot do natively: figure captions with auto-numbering, cross-references (e.g., "**Figure 1** shows [description]"), and bulk paragraph font/spacing formatting.
+All document manipulation is done entirely with **python-docx** and direct OOXML construction via **lxml** — no Microsoft Word or COM automation required. Figure captions use `SEQ Figure \* ARABIC` field codes and cross-references use `REF _Ref_Fig_N \h \* Charformat` field codes, both hand-crafted as XML elements. Word auto-updates these fields when the document is opened.
 
 ### `wordextraction.py` — Data Extraction Flow
 
@@ -116,25 +112,24 @@ flowchart TD
     A([Run main.py]) --> B[User enters Report ID]
     B --> C[Read report_info.csv]
     B --> D[Read picture_info.csv]
-    C & D --> E[Copy Template Report.docx to Output Report/]
+    C & D --> E[Copy Template Report.docx · open as Document object]
 
-    E --> F["win32com: Set document properties<br/>Title · Author · Subject · Keywords"]
-    F --> G["python-docx: Insert text sections<br/>Introduction · Entrance Meeting · Conclusions"]
-    G --> H["python-docx: Build bullet lists<br/>Drawings Used · Specifications Used"]
+    E --> F["Update document properties<br/>via lxml custom XML"]
+    F --> G["Insert text sections<br/>Introduction · Entrance Meeting · Conclusions"]
+    G --> H["Build bullet lists<br/>Drawings Used · Specifications Used"]
 
     H --> I{For each image pair}
 
     subgraph loop["  Image Processing Loop  "]
-        J["python-docx: Create 1- or 2-column image table<br/>and insert images"]
-        K["win32com: Add auto-numbered figure caption<br/>e.g. Figure 1: description"]
-        L["python-docx: Insert placeholder bullet above table"]
-        M["win32com: Insert cross-reference<br/>e.g. Figure 1 shows description"]
-        N["win32com: Format bullet — Calibri 12pt · bold figure ref"]
-        J --> K --> L --> M --> N
+        J["Create 1- or 2-column image table"]
+        K["Insert SEQ caption field XML inside each cell<br/>e.g. Figure 1: description — returns bookmark name"]
+        L["Insert placeholder bullets above table"]
+        M["Rewrite bullets as REF field XML<br/>e.g. Figure 1 shows description"]
+        J --> K --> L --> M
     end
 
     I --> J
-    N --> I
-    I -->|All images done| O[python-docx: Clean up empty paragraphs]
-    O --> P([Output: Report_XXXX_CustomerName.docx])
+    M --> I
+    I -->|All images done| O["Clean up empty paragraphs"]
+    O --> P([doc.save → Report_XXXX_CustomerName.docx])
 ```
