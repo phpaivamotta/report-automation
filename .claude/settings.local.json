@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir /s \"c:\\\\Users\\\\pmotta\\\\OneDrive - Maverick Applied Science\\\\Desktop\\\\report-automation\")"
+    ]
+  }
+}

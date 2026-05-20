@@ -1,189 +1,418 @@
 from docx import Document
-from docx.shared import Inches
-from docx.shared import Pt
-import win32com.client as win32
+from docx.shared import Inches, Pt
 from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.enum.text import WD_BREAK
 from docx.oxml import OxmlElement, parse_xml
-from docx.oxml.ns import nsdecls
-from docx.oxml.ns import qn
+from docx.oxml.ns import nsdecls, qn
 from copy import deepcopy
 import csv
-import time
 import os
 import glob
 
+_XML_SPACE = '{http://www.w3.org/XML/1998/namespace}space'
 
-def add_table_with_images(output_doc_file_path, header_text, table_counter, num_cols, image_path1, image_path2=None):
 
-    doc = Document(output_doc_file_path) #Don't pass in python-docx object, wincom library likes paths
+# ---------------------------------------------------------------------------
+# Internal formatting helpers
+# ---------------------------------------------------------------------------
 
+def _set_run_font(run):
+    run.font.name = 'Calibri'
+    run.font.size = Pt(12)
+
+
+def _set_para_spacing(para):
+    para.paragraph_format.space_before = Pt(6)
+    para.paragraph_format.space_after = Pt(6)
+
+
+def _apply_formatting(para):
+    _set_para_spacing(para)
+    for run in para.runs:
+        _set_run_font(run)
+
+
+# ---------------------------------------------------------------------------
+# Document properties
+# ---------------------------------------------------------------------------
+
+def update_document_properties(doc, report_data):
+    doc.core_properties.title = report_data['Customer']
+    doc.core_properties.author = report_data['From']
+    doc.core_properties.subject = report_data['Subject']
+    doc.core_properties.keywords = report_data['Maverick Job']
+
+    CP_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/custom-properties'
+    VT_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes'
+
+    custom_values = {
+        'customer address':  report_data.get('Customer Address', ''),
+        'inspection site':   report_data.get('Inspection Site', ''),
+        'customer po num':   report_data.get('Customer PO No.', ''),
+        'customer ccs':      report_data.get('Customer CCs', ''),
+        'inspection date':   report_data.get('Inspection Date(s)', ''),
+        'maverick ccs':      report_data.get('Maverick CCs', ''),
+        'report date':       report_data.get('Report Date', ''),
+        'customer contacts': report_data.get('Customer Contact', ''),
+    }
+
+    custom_part = None
+    for part in doc.part.package.iter_parts():
+        if hasattr(part, 'partname') and str(part.partname) == '/docProps/custom.xml':
+            custom_part = part
+            break
+
+    if custom_part is not None:
+        from lxml import etree
+        # Custom properties are loaded as a raw Part (bytes), not an XmlPart
+        tree = etree.fromstring(custom_part.blob)
+        for prop in tree.findall(f'{{{CP_NS}}}property'):
+            name = prop.get('name')
+            if name in custom_values:
+                lpwstr = prop.find(f'{{{VT_NS}}}lpwstr')
+                if lpwstr is not None:
+                    lpwstr.text = str(custom_values[name])
+        custom_part._blob = etree.tostring(tree, xml_declaration=True, encoding='UTF-8', standalone=True)
+    else:
+        print("Warning: custom properties part not found — custom fields not updated.")
+
+
+# ---------------------------------------------------------------------------
+# Text insertion
+# ---------------------------------------------------------------------------
+
+def insert_formatted_text_after_header(doc, header_text, content_to_insert):
+    target_paragraph = None
+    for paragraph in doc.paragraphs:
+        if header_text in paragraph.text:
+            target_paragraph = paragraph
+            break
+
+    if not target_paragraph:
+        print(f"Header '{header_text}' not found.")
+        return
+
+    new_paragraph = doc.add_paragraph()
+    target_paragraph._p.addnext(new_paragraph._p)
+    run = new_paragraph.add_run(content_to_insert)
+    _set_run_font(run)
+    _set_para_spacing(new_paragraph)
+    print(f"Formatted text inserted after '{header_text}'.")
+
+
+def add_formatted_bullets(doc, header_text, new_content_list, is_drawing=True):
+    target_paragraph = None
+    target_index = None
+    for i, paragraph in enumerate(doc.paragraphs):
+        if header_text in paragraph.text:
+            target_paragraph = paragraph
+            target_index = i
+            break
+
+    if not target_paragraph or target_index + 1 >= len(doc.paragraphs):
+        print(f"Header text '{header_text}' not found or it's the last paragraph.")
+        return
+
+    template_bullet = doc.paragraphs[target_index + 1]
+    new_bullets = []
+    for new_content in reversed(new_content_list):
+        new_bullet = deepcopy(template_bullet._element)
+        new_para = type(template_bullet)(new_bullet, template_bullet._parent)
+        if is_drawing and not new_content.startswith("Equipment Drawing:"):
+            new_content = f"Equipment Drawing: {new_content}"
+        new_para.text = new_content
+        for run in new_para.runs:
+            _set_run_font(run)
+        _set_para_spacing(new_para)
+        new_bullets.append(new_para)
+
+    for new_bullet in new_bullets:
+        template_bullet._element.addnext(new_bullet._element)
+    template_bullet._element.getparent().remove(template_bullet._element)
+
+
+# ---------------------------------------------------------------------------
+# Table creation
+# ---------------------------------------------------------------------------
+
+def add_table_with_images(doc, header_text, table_counter, num_cols, image_path1, image_path2=None):
     if table_counter == 0:
-        # Find the paragraph with the header text
         target_paragraph = None
         for paragraph in doc.paragraphs:
             if header_text in paragraph.text:
                 target_paragraph = paragraph
                 break
     else:
-        # Find the last table in the document
-        last_table = doc.tables[-1]  # Get the last table
-
-        # Get the last table's XML element
+        last_table = doc.tables[-1]
         tbl_element = last_table._element
-
-        # Create a new paragraph XML element
         new_paragraph_element = OxmlElement('w:p')
-
-        # Insert the new paragraph right after the last table
         tbl_element.addnext(new_paragraph_element)
-
-        # Create a paragraph object that we can use programmatically for further insertion
         target_paragraph = doc.add_paragraph()
         target_paragraph._element = new_paragraph_element
 
-
     if target_paragraph is None:
-        print(f"Header '{header_text}' not found in the document.")
-        return
+        print(f"Header '{header_text}' not found.")
+        return None
 
     target_paragraph.insert_paragraph_before()
 
-    # Add a table after the new paragraph
-    # We can't directly control placement through doc.add_table, so we'll insert it programmatically
     table = doc.add_table(rows=1, cols=num_cols)
-
     set_table_borders(table)
-
-     # Disable automatic table resizing
     table.autofit = False
-
-    # Set table alignment to center
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
 
-    # Set column widths
     for column in table.columns:
-        column.width = Inches(3.7)  # Set column width to 2 inches
+        column.width = Inches(3.7)
         for cell in column.cells:
             cell.width = Inches(3.7)
 
-    # Move the table to the specific location after the target paragraph
-    # Using the XML elements for moving the table
     target_paragraph._element.addnext(table._element)
 
-    # Add images to each cell in the table
     if num_cols == 1:
         cell = table.cell(0, 0)
         set_cell_margins(table, left=72, right=72, top=72, bottom=0)
         paragraph = cell.paragraphs[0]
         paragraph.alignment = WD_TABLE_ALIGNMENT.CENTER
-        run = paragraph.add_run()
-        run.add_picture(image_path1, width=Inches(3.6))  # Adjust width as needed
+        paragraph.add_run().add_picture(image_path1, width=Inches(3.6))
 
     elif num_cols == 2:
         cell = table.cell(0, 0)
         set_cell_margins(table, left=72, right=72, top=72, bottom=0)
         paragraph = cell.paragraphs[0]
         paragraph.alignment = WD_TABLE_ALIGNMENT.CENTER
-        run = paragraph.add_run()
-        run.add_picture(image_path1, width=Inches(3.6))  # Adjust width as needed
+        paragraph.add_run().add_picture(image_path1, width=Inches(3.6))
 
         cell = table.cell(0, 1)
-        set_cell_margins(table, left=72, right=72, top=72, bottom=0)
         paragraph = cell.paragraphs[0]
         paragraph.alignment = WD_TABLE_ALIGNMENT.CENTER
-        run = paragraph.add_run()
-        run.add_picture(image_path2, width=Inches(3.6))  # Adjust width as needed
+        paragraph.add_run().add_picture(image_path2, width=Inches(3.6))
 
-    # Save document to path
-    doc.save(output_doc_file_path)
-
-    print("Table with images were added successfully.")
+    print("Table with images added successfully.")
+    return table
 
 
-def replace_text_in_paragraph(paragraph, old_texts, new_texts):
-    for old_text, new_text in zip(old_texts, new_texts):
-        print(paragraph.text)
-        if old_text in paragraph.text:
-            paragraph.text = paragraph.text.replace(old_text, new_text)
+# ---------------------------------------------------------------------------
+# Bullets above tables
+# ---------------------------------------------------------------------------
 
-            run = paragraph.runs[0]
-            run.font.name = 'Calibri (Body)'
-            run.font.size = Pt(11)
+def add_bullets_above_tables(doc, table, num_cols):
+    paragraph_before_table = table._element.getprevious()
+    bullets = []
+
+    if paragraph_before_table is not None:
+        if num_cols >= 2:
+            bullet_1 = doc.add_paragraph("Bullet point 1", style='List Bullet 2')
+            bullet_2 = doc.add_paragraph("Bullet point 2", style='List Bullet 2')
+            paragraph_before_table.addnext(bullet_2._element)
+            bullet_2._element.addprevious(bullet_1._element)
+            bullets = [bullet_1, bullet_2]
+        else:
+            bullet_1 = doc.add_paragraph("Bullet point 1", style='List Bullet 2')
+            paragraph_before_table.addnext(bullet_1._element)
+            bullets = [bullet_1]
+
+    print("Bullets added above table.")
+    return bullets
 
 
-def replace_text_in_table(table, old_texts, new_texts):
-    for row in table.rows:
-        for cell in row.cells:
-            for paragraph in cell.paragraphs:
-                replace_text_in_paragraph(paragraph, old_texts, new_texts)
+# ---------------------------------------------------------------------------
+# Caption paragraph — SEQ field with bookmark
+# ---------------------------------------------------------------------------
 
-    print("Project details in Table 1 were modified successfully.")
+def add_caption_paragraph(after_element, caption_text, figure_index):
+    """
+    Insert a caption paragraph immediately after after_element.
+
+    Pass the image paragraph's _p element (inside the table cell) so the caption
+    lands as para[1] inside that cell — matching Word's native InsertCaption behaviour.
+    Returns (bookmark_name, caption_xml_element).
+    """
+    bm_name = f'_Ref_Fig_{figure_index}'
+    bm_id = figure_index
+
+    p = OxmlElement('w:p')
+
+    pPr = OxmlElement('w:pPr')
+    pStyle = OxmlElement('w:pStyle')
+    pStyle.set(qn('w:val'), 'Caption')
+    pPr.append(pStyle)
+    jc = OxmlElement('w:jc')
+    jc.set(qn('w:val'), 'center')
+    pPr.append(jc)
+    p.append(pPr)
+
+    bm_start = OxmlElement('w:bookmarkStart')
+    bm_start.set(qn('w:id'), str(bm_id))
+    bm_start.set(qn('w:name'), bm_name)
+    p.append(bm_start)
+
+    r_fig = OxmlElement('w:r')
+    t_fig = OxmlElement('w:t')
+    t_fig.set(_XML_SPACE, 'preserve')
+    t_fig.text = 'Figure '
+    r_fig.append(t_fig)
+    p.append(r_fig)
+
+    # fldSimple matches the structure Word's InsertCaption produces
+    fld = OxmlElement('w:fldSimple')
+    fld.set(qn('w:instr'), ' SEQ Figure \\* ARABIC ')
+    r_num = OxmlElement('w:r')
+    rPr_num = OxmlElement('w:rPr')
+    rPr_num.append(OxmlElement('w:noProof'))
+    r_num.append(rPr_num)
+    t_num = OxmlElement('w:t')
+    t_num.text = str(figure_index)
+    r_num.append(t_num)
+    fld.append(r_num)
+    p.append(fld)
+
+    bm_end = OxmlElement('w:bookmarkEnd')
+    bm_end.set(qn('w:id'), str(bm_id))
+    p.append(bm_end)
+
+    r_cap = OxmlElement('w:r')
+    t_cap = OxmlElement('w:t')
+    t_cap.set(_XML_SPACE, 'preserve')
+    t_cap.text = f': {caption_text}'
+    r_cap.append(t_cap)
+    p.append(r_cap)
+
+    after_element.addnext(p)
+    return bm_name, p
 
 
-def add_captions_with_win32com(doc_path, i, num_cols, image_path1, image_path2=None, caption1=None, caption2=None):
-    # Open Word application
-    word = win32.Dispatch('Word.Application')
-    word.Visible = False  # Set to True if you want to see Word while working
+# ---------------------------------------------------------------------------
+# Cross-reference bullet — REF field pointing to caption bookmark
+# ---------------------------------------------------------------------------
 
-    # Open the existing document
-    doc = word.Documents.Open(doc_path)
-    
-    # Loop through all inline shapes (images) in the document
-    # for i, inline_shape in enumerate(doc.InlineShapes):
-    
-    if num_cols == 1:
-        # Select the inline shape (image)
-        doc.InlineShapes(i+1).Select() # The InlineShape() method is 1-based indexed
-        # Insert a caption for the selected image
-        word.Selection.InsertCaption(Label="Figure", Title=f": {caption1}", Position=-1)
-        # Move the selection to the end of the caption
-        word.Selection.MoveRight(Unit=2, Count=1, Extend=1)
-        # Delete any text after the caption label (if any text remains after "Figure X")
-        word.Selection.TypeBackspace()
+def build_cross_reference_bullet(para, description, bookmark_name, figure_index):
+    """
+    Rewrite a placeholder bullet paragraph in-place as:
+      [bold REF field → "Figure N"] [" shows "] [description]
+    """
+    p = para._element
 
-    elif num_cols ==  2:
-        # Select the inline shape (image)
-        doc.InlineShapes(i+1).Select() # The InlineShape() method is 1-based indexed
-        # Insert a caption for the selected image
-        word.Selection.InsertCaption(Label="Figure", Title=f": {caption1}", Position=-1)
-        # Move the selection to the end of the caption
-        word.Selection.MoveRight(Unit=2, Count=1, Extend=1)
-        # Delete any text after the caption label (if any text remains after "Figure X")
-        word.Selection.TypeBackspace()
+    # Remove existing runs and hyperlinks
+    for child in list(p):
+        local = child.tag.split('}')[-1] if '}' in child.tag else child.tag
+        if local in ('r', 'hyperlink', 'ins', 'del'):
+            p.remove(child)
 
-        # Select the inline shape (image)
-        doc.InlineShapes(i+2).Select() # The InlineShape() method is 1-based indexed
-        # Insert a caption for the selected image (exclude custom title, only label + number)
-        word.Selection.InsertCaption(Label="Figure", Title=f": {caption2}", Position=-1)
-        # Move the selection to the end of the caption
-        word.Selection.MoveRight(Unit=2, Count=1, Extend=1)
-        # Delete any text after the caption label (if any text remains after "Figure X")
-        word.Selection.TypeBackspace()
+    if description.startswith("Figure shows "):
+        description = description[13:]
 
-    # Update all fields (important for cross-references)
-    # doc.Fields.Update()
-    # time.sleep(5)
-    # Save and close the document
-    doc.SaveAs(doc_path)
-    # doc.Save()
-    doc.Close()
-    word.Quit()
+    def _bold_calibri_rpr():
+        # \* Charformat copies the formatting of the instrText run's first character
+        # onto the entire field result. All three properties must be set here so
+        # that after a field update the result stays bold Calibri 12pt.
+        rPr = OxmlElement('w:rPr')
+        rPr.append(OxmlElement('w:b'))
+        rFonts = OxmlElement('w:rFonts')
+        rFonts.set(qn('w:ascii'), 'Calibri')
+        rFonts.set(qn('w:hAnsi'), 'Calibri')
+        rPr.append(rFonts)
+        sz = OxmlElement('w:sz')
+        sz.set(qn('w:val'), '24')  # 12pt in half-points
+        rPr.append(sz)
+        return rPr
 
-    print("Captions added successfully.")
+    def _text_rpr():
+        rPr = OxmlElement('w:rPr')
+        rFonts = OxmlElement('w:rFonts')
+        rFonts.set(qn('w:ascii'), 'Calibri')
+        rFonts.set(qn('w:hAnsi'), 'Calibri')
+        rPr.append(rFonts)
+        sz = OxmlElement('w:sz')
+        sz.set(qn('w:val'), '24')
+        rPr.append(sz)
+        return rPr
 
+    r_begin = OxmlElement('w:r')
+    r_begin.append(_bold_calibri_rpr())
+    fc_begin = OxmlElement('w:fldChar')
+    fc_begin.set(qn('w:fldCharType'), 'begin')
+    r_begin.append(fc_begin)
+    p.append(r_begin)
+
+    # instrText run carries the formatting \* Charformat will copy to the result
+    r_instr = OxmlElement('w:r')
+    r_instr.append(_bold_calibri_rpr())
+    instr = OxmlElement('w:instrText')
+    instr.set(_XML_SPACE, 'preserve')
+    instr.text = f' REF {bookmark_name} \\h \\* Charformat '
+    r_instr.append(instr)
+    p.append(r_instr)
+
+    r_sep = OxmlElement('w:r')
+    fc_sep = OxmlElement('w:fldChar')
+    fc_sep.set(qn('w:fldCharType'), 'separate')
+    r_sep.append(fc_sep)
+    p.append(r_sep)
+
+    # Cached display — bold Calibri "Figure N" (Word replaces this on field update,
+    # using the formatting it copied from the instrText run via \* Charformat)
+    r_val = OxmlElement('w:r')
+    r_val.append(_bold_calibri_rpr())
+    t_val = OxmlElement('w:t')
+    t_val.text = f'Figure {figure_index}'
+    r_val.append(t_val)
+    p.append(r_val)
+
+    r_end = OxmlElement('w:r')
+    fc_end = OxmlElement('w:fldChar')
+    fc_end.set(qn('w:fldCharType'), 'end')
+    r_end.append(fc_end)
+    p.append(r_end)
+
+    # " shows <description>" in Calibri 12pt
+    r_desc = OxmlElement('w:r')
+    r_desc.append(_text_rpr())
+    t_desc = OxmlElement('w:t')
+    t_desc.set(_XML_SPACE, 'preserve')
+    t_desc.text = f' shows {description}'
+    r_desc.append(t_desc)
+    p.append(r_desc)
+
+    _set_para_spacing(para)
+
+
+# ---------------------------------------------------------------------------
+# Cleanup
+# ---------------------------------------------------------------------------
+
+def remove_empty_paragraphs_after_table(doc):
+    for i, table in enumerate(doc.tables):
+        if i == 0:
+            continue
+        next_element = table._element.getnext()
+        while next_element is not None and next_element.tag.endswith('p'):
+            paragraph_text = "".join(next_element.itertext()).strip()
+            if not paragraph_text:
+                parent = next_element.getparent()
+                parent.remove(next_element)
+                next_element = table._element.getnext()
+            else:
+                break
+
+
+def remove_first_empty_paragraph_above_text(doc, text):
+    for paragraph in doc.paragraphs:
+        if text in paragraph.text:
+            prev_paragraph = paragraph._element.getprevious()
+            if prev_paragraph is not None and prev_paragraph.tag.endswith('p'):
+                prev_text = "".join(prev_paragraph.itertext()).strip()
+                if not prev_text:
+                    prev_paragraph.getparent().remove(prev_paragraph)
+            break
+
+
+# ---------------------------------------------------------------------------
+# Table styling helpers
+# ---------------------------------------------------------------------------
 
 def set_table_borders(table):
-    """
-    Set the borders of the table to the specified color with a width of 2.25 pt.
-    """
-    # Calculate the border size in eighths of a point
-    border_size = 18  # 2.25 pt * 8 = 18 units
-
-    # Define the border color
-    border_color = "002060"  # Hex color code for RGB(0,32,96)
-
-    # Define the border style XML
+    border_size = 18  # 2.25pt × 8
+    border_color = "002060"
     tbl_borders = parse_xml(r'''
         <w:tblBorders %s>
             <w:top w:val="single" w:sz="%d" w:space="0" w:color="%s"/>
@@ -200,21 +429,15 @@ def set_table_borders(table):
             border_size, border_color,
             border_size, border_color,
             border_size, border_color,
-            border_size, border_color
+            border_size, border_color,
         ))
-
-    # Access or create the table properties element
     tblPr = table._tbl.tblPr
     if tblPr is None:
         tblPr = OxmlElement('w:tblPr')
         table._tbl.insert(0, tblPr)
-
-    # Remove any existing borders element
-    tblBorders = tblPr.find(qn('w:tblBorders'))
-    if tblBorders is not None:
-        tblPr.remove(tblBorders)
-
-    # Append the borders element to the table properties
+    existing = tblPr.find(qn('w:tblBorders'))
+    if existing is not None:
+        tblPr.remove(existing)
     tblPr.append(tbl_borders)
 
 
@@ -222,529 +445,89 @@ def set_cell_margins(table, left=0, right=0, top=0, bottom=0):
     tc = table._element
     tblPr = tc.tblPr
     tblCellMar = OxmlElement('w:tblCellMar')
-    kwargs = {"left":left, "right":right, "top":top, "bottom":bottom}
-    for m in ["left","right", "top", "bottom"]:
-        node = OxmlElement("w:{}".format(m))
-        node.set(qn('w:w'), str(kwargs.get(m)))
+    for m, v in [('left', left), ('right', right), ('top', top), ('bottom', bottom)]:
+        node = OxmlElement(f'w:{m}')
+        node.set(qn('w:w'), str(v))
         node.set(qn('w:type'), 'dxa')
         tblCellMar.append(node)
-
     tblPr.append(tblCellMar)
 
 
-def add_bullets_above_tables(output_doc_file_path, table_counter, num_cols):
+# ---------------------------------------------------------------------------
+# Misc utilities (unchanged)
+# ---------------------------------------------------------------------------
 
-    doc = Document(output_doc_file_path)
-
-    # Loop through all tables in the document
-    table = doc.tables[table_counter+1] # Table 1 should be skipped since it is the properties table
-
-    # Find the paragraph just before the table
-    paragraph_before_table = table._element.getprevious()
-
-    if paragraph_before_table is not None:
-        if num_cols == 2:
-            # Insert two bullet points above the table
-            bullet_1 = doc.add_paragraph("Bullet point 1", style='List Bullet 2')
-            bullet_2 = doc.add_paragraph("Bullet point 2", style='List Bullet 2')
-            
-            # Insert the bullet points before the table
-            paragraph_before_table.addnext(bullet_2._element)
-            bullet_2._element.addprevious(bullet_1._element)
-
-        if num_cols == 1:
-            # Insert two bullet points above the table
-            bullet_1 = doc.add_paragraph("Bullet point 1", style='List Bullet 2')
-            
-            # Insert the bullet points before the table
-            paragraph_before_table.addnext(bullet_1._element)
-
-    # doc.save(output_doc_file_path)
-    print(f"Bullets added above all tables except the first")
-    doc.save(output_doc_file_path)
-    # return doc
-
-    # doc.save(output_doc_file_path)
+def replace_text_in_paragraph(paragraph, old_texts, new_texts):
+    for old_text, new_text in zip(old_texts, new_texts):
+        if old_text in paragraph.text:
+            paragraph.text = paragraph.text.replace(old_text, new_text)
+            run = paragraph.runs[0]
+            run.font.name = 'Calibri (Body)'
+            run.font.size = Pt(11)
 
 
-def append_cross_references_to_bullets(docx_path, i, num_cols, description1, description2=None):
-    """Append cross-references to the beginning of each bullet point and make Figure 1 and Figure 2 bold."""
-    # Open Word application
-    word = win32.Dispatch('Word.Application')
-    word.Visible = False  # Set to True if you want to see Word while working
-
-    # Open the existing document
-    doc = word.Documents.Open(docx_path)
-
-    # Set the figure references for bullet 1 and bullet 2
-    figure_1_ref = i + 1  # Reference to Figure 1
-    figure_2_ref = i + 2  # Reference to Figure 2
-
-    # Loop through the paragraphs to find bullet points and append cross-references
-    for para in doc.Paragraphs:
-        if para.Range.Text.strip() == "Bullet point 1":
-            # Move the cursor to the beginning of the paragraph and insert the cross-reference for Figure 1
-            word.Selection.SetRange(para.Range.Start, para.Range.Start)
-            
-            # Record the start position before inserting the cross-reference
-            start_pos = word.Selection.Start
-
-            word.Selection.InsertCrossReference(
-                ReferenceType="Figure",
-                ReferenceKind=3,  # 3 corresponds to wdOnlyLabelAndNumber (Figure X)
-                ReferenceItem=figure_1_ref,
-                InsertAsHyperlink=True,  # Optional: make it a hyperlink
-                IncludePosition=False,
-                SeparateNumbers=False,
-                SeparatorString=" "
-            )
-
-            # Record the end position after inserting the cross-reference
-            end_pos = word.Selection.Start
-
-            # Modify the field code to include \* Charformat
-            field_range = doc.Range(Start=start_pos, End=end_pos)
-            if field_range.Fields.Count > 0:
-                field = field_range.Fields(1)
-                field_code = field.Code.Text
-                if "\\* Charformat" not in field_code:
-                    # Ensure there's a space before appending the switch
-                    if not field_code.rstrip().endswith(" "):
-                        field_code = field_code.rstrip() + " "
-                    field_code = field_code.rstrip() + "\\*Charformat "
-                    field.Code.Text = field_code
-                field.Update()
-            else:
-                print("No field found in the range.")
-
-            # Bold the inserted Figure 1 text
-            word.Selection.MoveLeft(Unit=1, Count=1, Extend=True)  # 1 = wdCharacter
-            word.Selection.Font.Bold = True
-
-            # Move cursor to the end of the bolded Figure 1 text
-            word.Selection.Collapse(Direction=0)
-
-            word.Selection.TypeText(" ")  # Add a space before the original text
-
-            word.Selection.Font.Bold = False
-
-            word.Selection.TypeText("shows ")  # Add a space before the original text
-
-            # Remove "Figure shows " from the beginning of the description if present
-            if description1.startswith("Figure shows "):
-                description1 = description1[13:]
-
-            word.Selection.TypeText(description1)  # Add description
-
-            # Move the selection to the end of the caption
-            word.Selection.MoveRight(Unit=1, Count=14, Extend=1) #Bullet point 1
-
-            # Delete any text after the caption label (if any text remains after "Figure X")
-            word.Selection.TypeBackspace()
-
-            set_font_formatting(para, word)
-
-            set_paragraph_spacing(para, word)
-
-        elif para.Range.Text.strip() == "Bullet point 2":
-            # Move the cursor to the beginning of the paragraph and insert the cross-reference for Figure 2
-            word.Selection.SetRange(para.Range.Start, para.Range.Start)
-
-            #Record the start position before inserting the cross-reference
-            start_pos = word.Selection.Start
-
-            word.Selection.InsertCrossReference(
-                ReferenceType="Figure",
-                ReferenceKind=3,  # 3 corresponds to wdOnlyLabelAndNumber (Figure X)
-                ReferenceItem=figure_2_ref,
-                InsertAsHyperlink=True,  # Optional: make it a hyperlink
-                IncludePosition=False,
-                SeparateNumbers=False,
-                SeparatorString=" "
-            )
-
-            # Record the end position after inserting the cross-reference
-            end_pos = word.Selection.Start
-
-            # Modify the field code to include \* Charformat
-            field_range = doc.Range(Start=start_pos, End=end_pos)
-            if field_range.Fields.Count > 0:
-                field = field_range.Fields(1)
-                field_code = field.Code.Text
-                if "\\* Charformat" not in field_code:
-                    # Ensure there's a space before appending the switch
-                    if not field_code.rstrip().endswith(" "):
-                        field_code = field_code.rstrip() + " "
-                    field_code = field_code.rstrip() + "\\*Charformat "
-                    field.Code.Text = field_code
-                field.Update()
-            else:
-                print("No field found in the range.")
-
-            # Bold the inserted Figure 2 text
-            word.Selection.MoveLeft(Unit=1, Count=1, Extend=True)  # 1 = wdCharacter
-            word.Selection.Font.Bold = True
-
-            # Move cursor to the end of the bolded Figure 2 text
-            word.Selection.Collapse(Direction=0)
-
-            word.Selection.TypeText(" ")  # Add a space before the original text
-
-            word.Selection.Font.Bold = False
-
-            word.Selection.TypeText("shows ")  # Add a space before the original text
-
-            # Remove "Figure shows " from the beginning of the description if present
-            if description2.startswith("Figure shows "):
-                description2 = description2[13:]
-
-            word.Selection.TypeText(description2)  # Add description
-
-            # Move the selection to the end of the caption
-            word.Selection.MoveRight(Unit=1, Count=14, Extend=1) #Bullet point 1
-
-            # Delete any text after the caption label (if any text remains after "Figure X")
-            word.Selection.TypeBackspace()
-
-            set_font_formatting(para, word)
-
-            set_paragraph_spacing(para, word)
-            
-    # time.sleep(5)
-    # Save the document with cross-references
-    doc.SaveAs(docx_path)
-    doc.Save()
-    doc.Close()
-    word.Quit()
-
-    print(f"Cross-references added.")
+def replace_text_in_table(table, old_texts, new_texts):
+    for row in table.rows:
+        for cell in row.cells:
+            for paragraph in cell.paragraphs:
+                replace_text_in_paragraph(paragraph, old_texts, new_texts)
+    print("Project details in Table 1 were modified successfully.")
 
 
-def set_font_formatting(para, word):
-    """Set font formatting for the paragraph to Calibri 12."""
-    # Apply the font to the whole range of the paragraph
-    para.Range.Font.Name = 'Calibri (Body)'
-    para.Range.Font.Size = 12
-
-def set_paragraph_spacing(para, word):
-    word.Selection.SetRange(para.Range.Start, para.Range.End)
-    word.Selection.ParagraphFormat.SpaceBefore = 6
-    word.Selection.ParagraphFormat.SpaceAfter = 6
-    para.Style.NoSpaceBetweenParagraphsOfSameStyle = False
-
-
-def delete_template_bullets(output_doc_file_path):
-
-    doc = Document(output_doc_file_path)
-
+def delete_template_bullets(doc):
     count = 0
     for para in doc.paragraphs:
         if para.style.name in ["List Bullet", "List Bullet 2", "List Bullet 3"]:
             if count >= 3:
                 break
-            # Remove the paragraph from the parent element (body)
             p = para._element
             p.getparent().remove(p)
-            # Clean up after removing
-            p._element = p = None
             count += 1
-
-    doc.save(output_doc_file_path)
-    print("Template bullets deleted.")
-    
 
 
 def get_images_from_folder(folder_path):
-    # Define the image extensions you want to search for
     image_extensions = ['*.jpg', '*.jpeg', '*.png', '*.gif', '*.bmp', '*.tiff']
-
-    # List to store the image file paths
     image_paths = []
-    # Loop through each image extension to grab matching files
     for extension in image_extensions:
         image_paths.extend(glob.glob(os.path.join(folder_path, extension)))
+    return sorted(image_paths, key=lambda x: x.lower())
 
-    image_paths = sorted(image_paths, key=lambda x: x.lower())
-
-    return image_paths
 
 def delete_paragraph(paragraph):
-    # Access the XML element of the paragraph
     p = paragraph._element
-    # Access the parent element of the paragraph (usually the document body)
     p.getparent().remove(p)
-    # Clean up after removing
     paragraph._element = None
 
 
-def remove_empty_paragraphs_after_table(output_doc_file_path):
-    """
-    This function checks for empty paragraphs after tables and removes them.
-    """
-
-    doc = Document(output_doc_file_path)
-
+def add_page_break_below_table(doc):
     for i, table in enumerate(doc.tables):
         if i == 0:
             continue
-        
-        # Get the next element after the table
-        next_element = table._element.getnext()
-
-        # Continue checking for next paragraphs as long as they exist and are paragraphs
-        while next_element is not None and next_element.tag.endswith('p'):
-            # Check if the next element is a paragraph and is effectively empty (strip spaces and non-breaking spaces)
-            paragraph_text = "".join(next_element.itertext()).strip()
-            if not paragraph_text:
-                # If it's an empty paragraph, remove it
-                parent = next_element.getparent()
-                parent.remove(next_element)
-
-                # Get the next element after the removed one
-                next_element = table._element.getnext()
-            else:
-                break  # Exit the loop if the paragraph is not empty
-
-    # Save the document after making modifications
-    doc.save(output_doc_file_path)
-    # return doc
-
-
-def remove_first_empty_paragraph_above_text(output_doc_file_path, text):
-    """
-    Removes the first empty paragraph above the given text in the document.
-    """
-
-    doc = Document(output_doc_file_path)
-
-    # Iterate through paragraphs to find the one containing the target text
-    for i, paragraph in enumerate(doc.paragraphs):
-        if text in paragraph.text:
-            # Check for the preceding paragraph
-            prev_paragraph = paragraph._element.getprevious()
-
-            # If the previous element is an empty paragraph, remove it
-            if prev_paragraph is not None and prev_paragraph.tag.endswith('p'):
-                prev_text = "".join(prev_paragraph.itertext()).strip()
-                if not prev_text:
-                    # Remove the first empty paragraph found
-                    parent = prev_paragraph.getparent()
-                    parent.remove(prev_paragraph)
-                break  # Stop after deleting the first empty paragraph
-            break  # Exit once the target paragraph is found
-
-    doc.save(output_doc_file_path)
-    # return doc
-
-def add_page_break_below_table(output_doc_file_path):
-    doc = Document(output_doc_file_path)
-    
-    for i, table in enumerate(doc.tables):
-        if i == 0:
-            continue
-
         if i % 2 == 0:
-            # # Get the last table's XML element
-            # tbl_element = table._element
-
-            # # Create a new paragraph XML element
-            # new_paragraph_element = OxmlElement('w:p')
-
-            # # Insert the new paragraph right after the last table
-            # tbl_element.addnext(new_paragraph_element)
-
-            # # Insert a page break after the new paragraph
-            # new_paragraph_element.add_run().add_break(WD_BREAK.PAGE)
-            # Get the last table's XML element
             tbl_element = table._element
-
-            # Create a new paragraph below the table
             new_paragraph = doc.add_paragraph()
-
-            # Insert the paragraph after the table in the XML tree
             tbl_element.addnext(new_paragraph._element)
-
-            # Insert a page break after the new paragraph
             new_paragraph.add_run().add_break(WD_BREAK.PAGE)
 
-    doc.save(output_doc_file_path)
-    
-def insert_formatted_text_after_header(docx_path, header_text, content_to_insert):
-    """
-    Finds a header text in the document and inserts formatted content below it.
-    
-    :param docx_path: Path to the Word document
-    :param header_text: The header text to search for
-    :param content_to_insert: The content to insert after the header
-    """
-    # Use python-docx to find the header and insert content
-    doc = Document(docx_path)
-    
-    target_paragraph = None
-    for paragraph in doc.paragraphs:
-        if header_text in paragraph.text:
-            target_paragraph = paragraph
-            break
-    
-    if target_paragraph:
-        # Insert new paragraph after the target
-        new_paragraph = doc.add_paragraph()
-        target_paragraph._p.addnext(new_paragraph._p)
-        new_paragraph.text = content_to_insert
-        
-        # Save the document
-        doc.save(docx_path)
 
-        # Now use win32com for formatting
-        word = win32.Dispatch('Word.Application')
-        word.Visible = False
-        
-        doc = word.Documents.Open(docx_path)
-    
-        # Find the newly inserted paragraph
-        for para in doc.Paragraphs:
-            if content_to_insert in para.Range.Text:
-                set_font_formatting(para, word)
-                set_paragraph_spacing(para, word)
-                break
-        
-        # Save and close
-        doc.Save()
-        doc.Close()
-        word.Quit()
-
-        print(f"Formatted text inserted after '{header_text}'.")
-    else:
-        print(f"Header '{header_text}' not found in the document.")
+# ---------------------------------------------------------------------------
+# CSV readers
+# ---------------------------------------------------------------------------
 
 def read_report_data(report_csv_path, report_id):
-    with open(report_csv_path, 'r', newline='', encoding='utf-8') as report_csv:
-        reader = csv.DictReader(report_csv)
+    with open(report_csv_path, 'r', newline='', encoding='utf-8') as f:
+        reader = csv.DictReader(f)
         for row in reader:
             if int(row['Report ID']) == report_id:
                 return row
     return None
 
+
 def read_picture_data(picture_csv_path, report_id):
     pictures = []
-    with open(picture_csv_path, 'r', newline='', encoding='utf-8') as picture_csv:
-        reader = csv.DictReader(picture_csv)
+    with open(picture_csv_path, 'r', newline='', encoding='utf-8') as f:
+        reader = csv.DictReader(f)
         for row in reader:
             if int(row['Report ID']) == report_id:
                 pictures.append(row)
     return pictures
-
-
-def add_formatted_bullets(output_doc_file_path, header_text, new_content_list, is_drawing=True):
-    doc = Document(output_doc_file_path)
-
-    # Find the paragraph containing the header text
-    target_paragraph = None
-    for i, paragraph in enumerate(doc.paragraphs):
-        if header_text in paragraph.text:
-            target_paragraph = paragraph
-            target_index = i
-            break
-
-    if target_paragraph and target_index + 1 < len(doc.paragraphs):
-        # The template bullet is always the next paragraph after the header
-        template_bullet = doc.paragraphs[target_index + 1]
-
-        # Create new bullets, building from bottom up
-        new_bullets = []
-        for new_content in reversed(new_content_list):
-            # Deep copy the template bullet
-            new_bullet = deepcopy(template_bullet._element)
-            
-            # Create a new paragraph object from the copied element
-            new_para = type(template_bullet)(new_bullet, template_bullet._parent)
-            
-            # Prepare the text content
-            if is_drawing and not new_content.startswith("Equipment Drawing:"):
-                new_content = f"Equipment Drawing: {new_content}"
-
-            # Set the text of the new paragraph
-            new_para.text = new_content
-
-            new_bullets.append(new_para)
-
-        # Insert the new bullets after the template bullet
-        for new_bullet in new_bullets:
-            template_bullet._element.addnext(new_bullet._element)
-
-        # Remove the original template bullet if requested
-        template_bullet._element.getparent().remove(template_bullet._element)
-
-    else:
-        print(f"Header text '{header_text}' not found or it's the last paragraph in the document.")
-
-    doc.save(output_doc_file_path)
-    return doc
-
-def format_paragraphs_with_win32com(docx_path, start_target_text, end_target_text):
-    # Open Word application
-    word = win32.Dispatch('Word.Application')
-    word.Visible = False  # Set to True if you want to see Word while working
-
-    try:
-        # Open the existing document
-        doc = word.Documents.Open(docx_path)
-
-        formatting_active = False
-        for para in doc.Paragraphs:
-            if start_target_text in para.Range.Text:
-                formatting_active = True
-                continue
-            
-            if formatting_active:
-                if end_target_text in para.Range.Text:
-                    break  # Stop formatting when we reach the end target text
-                
-                # Apply formatting
-                set_font_formatting(para, word)
-                set_paragraph_spacing(para, word)
-
-        # Save and close
-        doc.Save()
-        doc.Close()
-
-    finally:
-        # Quit Word application
-        word.Quit()
-
-def update_document_properties(doc_path, report_data):
-    # Open Word application
-    word = win32.Dispatch("Word.Application")
-
-    # Open the document (provide the full path to the document)
-    doc = word.Documents.Open(doc_path)
-
-    # Access core (built-in) properties
-    core_props = doc.BuiltInDocumentProperties
-
-    # Access and modify core properties
-    core_props("Title").Value = report_data['Customer']
-    core_props("Author").Value = report_data['From']
-    core_props("Subject").Value = report_data['Subject']
-    core_props("Keywords").Value = report_data['Maverick Job']
-
-    # Access custom properties
-    custom_props = doc.CustomDocumentProperties
-
-    # Access and modify custom properties
-    custom_props("customer address").Value = report_data['Customer Address']
-    custom_props("inspection site").Value = report_data['Inspection Site']
-    custom_props("customer po num").Value = report_data['Customer PO No.']
-    custom_props("customer ccs").Value = report_data['Customer CCs']
-    custom_props("inspection date").Value = report_data['Inspection Date(s)']
-    custom_props("maverick ccs").Value = report_data['Maverick CCs']
-    custom_props("report date").Value = report_data['Report Date']
-    custom_props("customer contacts").Value = report_data['Customer Contact']
-    # custom_props("author title").Value = "O Foda"
-    # custom_props("maverick contact info cell").Value = "696-2424-420"
-    # custom_props("maverick contact info email").Value = "myemail@gmail.com"
-
-    # Close the document and quit Word
-    doc.Save()
-    doc.Close()
-    word.Quit()
