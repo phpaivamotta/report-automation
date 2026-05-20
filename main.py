@@ -162,7 +162,7 @@ if __name__ == "__main__":
             print(f"Report generated successfully: {output_file_name}")
 
             # Add paragraph and page break above second table inserted to page
-            add_page_break_below_table(output_doc_file_path)
+            # add_page_break_below_table(output_doc_file_path)
 
         else:
             print(f"The template file path {template_file_path} does not exist. Please input a valid file path.")
