@@ -9,29 +9,42 @@ Automates the generation of professional Word inspection reports for Maverick Ap
 
 ## Setup
 
-Copy `.env.example` to `.env` and update the four paths to match your local directories:
+Copy `.env.example` to `.env` and update the paths to match your local directories:
 
 ```
 TEMPLATE_DOC_PATH          → path to Templates/Template Report.docx
 OUTPUT_REPORT_FOLDER_PATH  → path to Output Report/ folder
 INPUT_DOC_PATH             → path to your filled-in input form
 EXTRACTED_DATA_PATH        → path to Reports Extracted Data/ folder
+INPUT_IMAGES_FOLDER_PATH   → path to a folder of photos for Stage 1 (optional)
+REPORT_INPUT_FORMS_FOLDER  → path to Report Input Forms/ folder
+INPUT_FORM_TEMPLATE_PATH   → path to Templates/Template Report Inputs Form.docx
 ```
 
 ## How to Use
 
-The workflow has two stages.
+The core workflow has two stages, with an optional pre-stage for bulk image insertion.
+
+### Stage 0 (optional) — Auto-Populate the Picture Column
+
+If you already have a folder of inspection photos, run the helper to produce a fresh copy of the input form with the Picture column pre-filled. Set `INPUT_IMAGES_FOLDER_PATH` to your photo folder, then:
+
+```bash
+python populate_input_pictures.py
+```
+
+This drops a new file in `Report Input Forms/` named `<folder_name>_<YYYYMMDD_HHMMSS>.docx`, with one image per row (natural-sorted by filename, scaled to 3.6" wide, height proportional). Open that file and continue with Stage 1.
 
 ### Stage 1 — Fill Out the Input Form
 
-> **Important:** Never edit `Templates/Template Report Inputs Form.docx` directly. Always make a copy first.
+> **Important:** Never edit `Templates/Template Report Inputs Form.docx` directly. Always make a copy first (or use Stage 0).
 
-Make a copy of `Templates/Template Report Inputs Form.docx`, give it a descriptive name (e.g., `Acme Corp Boiler Inspection 2026-05.docx`), and save it to `Report Input Forms/`. Fill in the copy:
+If you skipped Stage 0, make a copy of `Templates/Template Report Inputs Form.docx`, give it a descriptive name (e.g., `Acme Corp Boiler Inspection 2026-05.docx`), and save it to `Report Input Forms/`. Fill in the copy:
 
 - **4-column table** — customer name, address, contact, subject, PO number, job ID, inspection dates, drawings used, specifications used, and text for the Introduction, Entrance Meeting, and Conclusions sections.
-- **3-column table** — one row per image: description, caption, and an embedded image.
+- **3-column table** — one row per image: description, caption, and an embedded image (already inserted if you ran Stage 0).
 
-Save the completed form to `Report Input Forms/` under any name you like.
+Save the completed form to `Report Input Forms/` and set `INPUT_DOC_PATH` to its path.
 
 ### Stage 2 — Extract Data
 
@@ -65,6 +78,7 @@ report-automation/
 ├── main.py                          # Report generation orchestrator
 ├── utils.py                         # Document manipulation helpers
 ├── wordextraction.py                # Input form parser
+├── populate_input_pictures.py       # (Optional) Pre-fills input form Picture column from a folder
 ├── requirements.txt
 ├── .env                             # Local path configuration (not tracked)
 ├── .env.example                     # Template for .env

@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 pip install -r requirements.txt
-cp .env.example .env   # then fill in the four paths
+cp .env.example .env   # then fill in the paths
 ```
 
 The `.env` file must define:
@@ -14,8 +14,17 @@ The `.env` file must define:
 - `OUTPUT_REPORT_FOLDER_PATH` — path to `Output Report/` folder
 - `INPUT_DOC_PATH` — path to the filled-in input form in `Report Input Forms/`
 - `EXTRACTED_DATA_PATH` — path to `Reports Extracted Data/`
+- `INPUT_IMAGES_FOLDER_PATH` — path to a folder of photos to auto-insert into the input form (used by `populate_input_pictures.py`)
+- `REPORT_INPUT_FORMS_FOLDER` — path to `Report Input Forms/` (output destination for `populate_input_pictures.py`)
+- `INPUT_FORM_TEMPLATE_PATH` — path to `Templates/Template Report Inputs Form.docx`
 
 ## Running the Program
+
+**Stage 0 (optional) — auto-populate the input form's picture column from a folder of images:**
+```bash
+python populate_input_pictures.py
+```
+Produces a fresh copy of the input-form template in `REPORT_INPUT_FORMS_FOLDER` with the Picture column pre-filled. The user then opens that file, fills in Description/Caption text and the 4-column metadata, and points `INPUT_DOC_PATH` at it.
 
 **Stage 1 — extract data from a filled-in input form:**
 ```bash
@@ -32,7 +41,17 @@ There are no tests or lint commands configured in this project.
 
 ## Architecture
 
-The system is a two-stage pipeline that converts a filled-in Word form into a formatted inspection report.
+The system is a two-stage pipeline that converts a filled-in Word form into a formatted inspection report, with an optional pre-stage for bulk image insertion.
+
+### Stage 0 (optional): `populate_input_pictures.py`
+
+Standalone helper that pre-populates the Picture column of a fresh input-form copy from a folder of photos, so the user doesn't have to paste images one-by-one before filling out the form.
+
+- Reads `INPUT_IMAGES_FOLDER_PATH`, `REPORT_INPUT_FORMS_FOLDER`, `INPUT_FORM_TEMPLATE_PATH` from `.env`.
+- Copies the input-form template to `<REPORT_INPUT_FORMS_FOLDER>/<images_folder_name>_<YYYYMMDD_HHMMSS>.docx`.
+- Clears all data rows in the second table (rows 1–end; row 0 header preserved): strips every child of each `<w:tc>` except `<w:tcPr>` and appends a fresh empty `<w:p>`. This wipes dummy text and inline `<w:drawing>` while preserving cell width/margins.
+- Iterates folder images (natural-sorted by filename, filtered to `.jpg .jpeg .png .gif .bmp .tif .tiff`) and inserts each into column 2 of a successive row, centered, at `width=Inches(3.6)` with height auto-scaled. Adds new rows past the template's 38 data rows if needed.
+- Does **not** import or use `utils.py` — that module targets the output report; the input form has its own structure.
 
 ### Stage 1: `wordextraction.py`
 

@@ -1,7 +1,13 @@
 {
   "permissions": {
     "allow": [
-      "Bash(dir /s \"c:\\\\Users\\\\pmotta\\\\OneDrive - Maverick Applied Science\\\\Desktop\\\\report-automation\")"
+      "Bash(dir /s \"c:\\\\Users\\\\pmotta\\\\OneDrive - Maverick Applied Science\\\\Desktop\\\\report-automation\")",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\pmotta\\\\OneDrive - Maverick Applied Science\\\\Desktop\\\\report-automation\" -Force)",
+      "Bash(Select-Object Name, PSIsContainer)",
+      "Bash(Format-Table -AutoSize)",
+      "Bash(.venv\\\\Scripts\\\\python.exe -c \"import docx; print\\('python-docx available'\\)\")",
+      "Bash(cat)",
+      "Read(//tmp/**)"
     ]
   }
 }
