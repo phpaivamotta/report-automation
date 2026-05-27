@@ -203,11 +203,14 @@ def add_bullets_above_tables(doc, table, num_cols):
         if num_cols >= 2:
             bullet_1 = doc.add_paragraph("Bullet point 1", style='List Bullet 2')
             bullet_2 = doc.add_paragraph("Bullet point 2", style='List Bullet 2')
+            bullet_1.paragraph_format.keep_with_next = True
+            bullet_2.paragraph_format.keep_with_next = True
             paragraph_before_table.addnext(bullet_2._element)
             bullet_2._element.addprevious(bullet_1._element)
             bullets = [bullet_1, bullet_2]
         else:
             bullet_1 = doc.add_paragraph("Bullet point 1", style='List Bullet 2')
+            bullet_1.paragraph_format.keep_with_next = True
             paragraph_before_table.addnext(bullet_1._element)
             bullets = [bullet_1]
 
