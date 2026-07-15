@@ -26,6 +26,24 @@ def _set_para_spacing(para):
     para.paragraph_format.space_after = Pt(6)
 
 
+def _disable_contextual_spacing(para):
+    # Override the "Don't add space between paragraphs of the same style" setting
+    # that the bullet styles inherit, so the paragraph's space_before/space_after
+    # is honored between consecutive bullets.
+    pPr = para._element.get_or_add_pPr()
+    cs = pPr.find(qn('w:contextualSpacing'))
+    if cs is None:
+        cs = OxmlElement('w:contextualSpacing')
+        # Keep valid schema order: contextualSpacing must precede w:jc/w:rPr in w:pPr.
+        # (alignment=JUSTIFY writes w:jc, so a naive append would land out of order
+        # and make Word show a "repaired content" prompt on open.)
+        pPr.insert_element_before(
+            cs, 'w:jc', 'w:textDirection', 'w:textAlignment',
+            'w:textboxTightWrap', 'w:outlineLvl', 'w:divId', 'w:cnfStyle',
+            'w:rPr', 'w:sectPr', 'w:pPrChange')
+    cs.set(qn('w:val'), '0')
+
+
 def _apply_formatting(para):
     _set_para_spacing(para)
     for run in para.runs:
@@ -124,6 +142,7 @@ def add_formatted_bullets(doc, header_text, new_content_list, is_drawing=True):
         for run in new_para.runs:
             _set_run_font(run)
         _set_para_spacing(new_para)
+        _disable_contextual_spacing(new_para)
         new_para.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
         new_bullets.append(new_para)
 
@@ -206,6 +225,8 @@ def add_bullets_above_tables(doc, table, num_cols):
             bullet_2 = doc.add_paragraph("Bullet point 2", style='List Bullet 2')
             bullet_1.paragraph_format.keep_with_next = True
             bullet_2.paragraph_format.keep_with_next = True
+            _disable_contextual_spacing(bullet_1)
+            _disable_contextual_spacing(bullet_2)
             bullet_1.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
             bullet_2.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
             paragraph_before_table.addnext(bullet_2._element)
@@ -214,6 +235,7 @@ def add_bullets_above_tables(doc, table, num_cols):
         else:
             bullet_1 = doc.add_paragraph("Bullet point 1", style='List Bullet 2')
             bullet_1.paragraph_format.keep_with_next = True
+            _disable_contextual_spacing(bullet_1)
             bullet_1.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
             paragraph_before_table.addnext(bullet_1._element)
             bullets = [bullet_1]
@@ -381,6 +403,7 @@ def build_cross_reference_bullet(para, description, bookmark_name, figure_index)
     p.append(r_desc)
 
     _set_para_spacing(para)
+    _disable_contextual_spacing(para)
 
 
 # ---------------------------------------------------------------------------
