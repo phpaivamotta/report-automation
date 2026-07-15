@@ -1,7 +1,7 @@
 from docx import Document
 from docx.shared import Inches, Pt
 from docx.enum.table import WD_TABLE_ALIGNMENT
-from docx.enum.text import WD_BREAK
+from docx.enum.text import WD_BREAK, WD_ALIGN_PARAGRAPH
 from docx.oxml import OxmlElement, parse_xml
 from docx.oxml.ns import nsdecls, qn
 from copy import deepcopy
@@ -124,6 +124,7 @@ def add_formatted_bullets(doc, header_text, new_content_list, is_drawing=True):
         for run in new_para.runs:
             _set_run_font(run)
         _set_para_spacing(new_para)
+        new_para.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
         new_bullets.append(new_para)
 
     for new_bullet in new_bullets:
@@ -205,12 +206,15 @@ def add_bullets_above_tables(doc, table, num_cols):
             bullet_2 = doc.add_paragraph("Bullet point 2", style='List Bullet 2')
             bullet_1.paragraph_format.keep_with_next = True
             bullet_2.paragraph_format.keep_with_next = True
+            bullet_1.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+            bullet_2.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
             paragraph_before_table.addnext(bullet_2._element)
             bullet_2._element.addprevious(bullet_1._element)
             bullets = [bullet_1, bullet_2]
         else:
             bullet_1 = doc.add_paragraph("Bullet point 1", style='List Bullet 2')
             bullet_1.paragraph_format.keep_with_next = True
+            bullet_1.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
             paragraph_before_table.addnext(bullet_1._element)
             bullets = [bullet_1]
 
