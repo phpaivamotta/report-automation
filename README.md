@@ -81,23 +81,20 @@ TEMPLATE_DOC_PATH=C:\Users\jdoe\report-automation\Templates\Template Report.docx
 # Where finished reports are saved
 OUTPUT_REPORT_FOLDER_PATH=C:\Users\jdoe\report-automation\Output Report
 
-# The filled-in input form you want to turn into a report  <-- you change this for every report
-INPUT_DOC_PATH=C:\Users\jdoe\report-automation\Report Input Forms\Unit 12_20260522_095213.docx
-
 # Where extracted text/photos are saved (so past reports can be re-generated)
 EXTRACTED_DATA_PATH=C:\Users\jdoe\report-automation\Reports Extracted Data
 
 # (Optional step) Folder of photos to drop into a new input form  <-- change per report if you use it
 INPUT_IMAGES_FOLDER_PATH=C:\Users\jdoe\Pictures\Unit 12
 
-# (Optional step) Where the new input form is created
+# Where input forms live: Step A saves new forms here, and main.py's file browser opens here
 REPORT_INPUT_FORMS_FOLDER=C:\Users\jdoe\report-automation\Report Input Forms
 
 # (Optional step) The blank input-form template
 INPUT_FORM_TEMPLATE_PATH=C:\Users\jdoe\report-automation\Templates\Template Report Inputs Form.docx
 ```
 
-You set five of these once and don't touch them again. Only **`INPUT_DOC_PATH`** changes for every report, plus **`INPUT_IMAGES_FOLDER_PATH`** if you use the optional photo step. The scripts read `.env` each time they run, so save the file and run the script again.
+You set these once and don't touch them again, except **`INPUT_IMAGES_FOLDER_PATH`** if you use the optional photo step. The input form itself is not in `.env`: `main.py` asks you to pick it each time it runs. The scripts read `.env` each time they run, so save the file and run the script again.
 
 Setup is done.
 
@@ -131,17 +128,17 @@ If you skip this step, copy `Templates\Template Report Inputs Form.docx` into `R
 
 Open the form in Word and fill it in. Section 3 below describes every field. Save and close it.
 
-Then set **`INPUT_DOC_PATH`** in `.env` to that file's full path.
-
 ### Step C: generate the report
 
 ```powershell
 python main.py
 ```
 
-This does two things in one run:
+A file browser pops up in the `Report Input Forms\` folder. Select the form you filled in during Step B and click **Open**. Clicking **Cancel** stops the run without changing anything.
 
-1. Reads the form at `INPUT_DOC_PATH`, saves its text and photos into `Reports Extracted Data\`, and gives the report the next **Report ID** number (1, 2, 3, …).
+The script then does two things:
+
+1. Reads the form you picked, saves its text and photos into `Reports Extracted Data\`, and gives the report the next **Report ID** number (1, 2, 3, …).
 2. Builds the report from that data and saves it as:
 
 ```
@@ -150,7 +147,7 @@ Output Report\Report_0009_<Customer_Name>.docx
 
 > Each run creates a **new** Report ID, even for a form you have run before. If you fix something in the form, just run `python main.py` again. See [Troubleshooting](#5-troubleshooting) to clean up the old entry.
 
-**Re-generating a past report.** To rebuild a report that was already extracted (for example after editing `Template Report.docx`), pass its ID. This skips reading the input form and doesn't create a new ID:
+**Re-generating a past report.** To rebuild a report that was already extracted (for example after editing `Template Report.docx`), pass its ID. This skips the file browser and the input form, and doesn't create a new ID:
 
 ```powershell
 python main.py --report-id 9
@@ -205,7 +202,7 @@ Each row is one figure in the report, and the figures follow the same order as t
 
 | I want to… | Change this |
 |---|---|
-| Make a new report | Steps A–D above. Per report you only touch `.env` (`INPUT_DOC_PATH`, and `INPUT_IMAGES_FOLDER_PATH` if using Step A) and the input form. |
+| Make a new report | Steps A–D above. Per report you only fill in the input form (plus `INPUT_IMAGES_FOLDER_PATH` in `.env` if using Step A). `main.py` asks which form to use. |
 | Change the report text, values, or photos | The **input form**, then run Steps C and D again. |
 | Change the report's look: logo, fonts, header/footer, boilerplate wording, page layout | **`Templates\Template Report.docx`**. Edit it in Word like any document. See the warning below. |
 | Change the form people fill in | **`Templates\Template Report Inputs Form.docx`**. Keep the labels and the two-table layout the same, or the extraction script will stop finding the fields. |

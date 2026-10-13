@@ -1,6 +1,8 @@
 import os
 import csv
 import logging
+import tkinter as tk
+from tkinter import filedialog
 from docx import Document
 from docx.oxml.ns import qn
 from collections import OrderedDict
@@ -191,12 +193,32 @@ def append_to_csv(report_data, report_id, report_csv_path, picture_csv_path, rep
         logging.error(f"Error writing to CSV files: {str(e)}")
         raise
 
-def main():
-    """Extracts the input form at INPUT_DOC_PATH and returns the new report ID."""
+def select_input_form(initial_dir=None):
+    """Opens a file-browser pop-up to pick the input form; returns its path, or None if cancelled."""
+    root = tk.Tk()
+    root.withdraw()
+    root.attributes('-topmost', True)  # keep the dialog in front of the terminal/editor
+    docx_path = filedialog.askopenfilename(
+        parent=root,
+        title="Select the report input form",
+        initialdir=initial_dir if initial_dir and os.path.isdir(initial_dir) else None,
+        filetypes=[("Word documents", "*.docx")],
+    )
+    root.destroy()
+    return docx_path or None
+
+def main(docx_path=None):
+    """Extracts the input form at docx_path and returns the new report ID.
+
+    If docx_path is not given, a pop-up asks the user to browse for the input form.
+    """
     # Use environment variables
     load_dotenv(override=True)
     base_output_folder = os.getenv('EXTRACTED_DATA_PATH')
-    docx_path = os.getenv('INPUT_DOC_PATH')
+    if docx_path is None:
+        docx_path = select_input_form(os.getenv('REPORT_INPUT_FORMS_FOLDER'))
+        if docx_path is None:
+            raise SystemExit("No input form selected.")
     report_csv_path = os.path.join(base_output_folder, 'report_info.csv')
     picture_csv_path = os.path.join(base_output_folder, 'picture_info.csv')
 

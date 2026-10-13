@@ -12,11 +12,12 @@ cp .env.example .env   # then fill in the paths
 The `.env` file must define:
 - `TEMPLATE_DOC_PATH` — path to `Templates/Template Report.docx`
 - `OUTPUT_REPORT_FOLDER_PATH` — path to `Output Report/` folder
-- `INPUT_DOC_PATH` — path to the filled-in input form in `Report Input Forms/`
 - `EXTRACTED_DATA_PATH` — path to `Reports Extracted Data/`
 - `INPUT_IMAGES_FOLDER_PATH` — path to a folder of photos to auto-insert into the input form (used by `populate_input_pictures.py`)
-- `REPORT_INPUT_FORMS_FOLDER` — path to `Report Input Forms/` (output destination for `populate_input_pictures.py`)
+- `REPORT_INPUT_FORMS_FOLDER` — path to `Report Input Forms/` (output destination for `populate_input_pictures.py`; starting folder for `main.py`'s input-form file browser)
 - `INPUT_FORM_TEMPLATE_PATH` — path to `Templates/Template Report Inputs Form.docx`
+
+The input form to process is **not** set in `.env`: `main.py` asks for it on each run through a tkinter file-open dialog.
 
 ## Running the Program
 
@@ -24,13 +25,13 @@ The `.env` file must define:
 ```bash
 python populate_input_pictures.py
 ```
-Produces a fresh copy of the input-form template in `REPORT_INPUT_FORMS_FOLDER` with the Picture column pre-filled. The user then opens that file, fills in Description/Caption text and the 4-column metadata, and points `INPUT_DOC_PATH` at it.
+Produces a fresh copy of the input-form template in `REPORT_INPUT_FORMS_FOLDER` with the Picture column pre-filled. The user then opens that file, fills in Description/Caption text and the 4-column metadata, then selects it when `main.py` prompts.
 
-**Stages 1 + 2 — extract the input form at `INPUT_DOC_PATH` and generate its report:**
+**Stages 1 + 2 — browse for an input form, extract it, and generate its report:**
 ```bash
 python main.py
 ```
-`main.py` calls `wordextraction.main()` (which assigns and returns the new Report ID), then builds that report.
+`main.py` calls `wordextraction.main()`, which opens a file-browser pop-up (`select_input_form()`, starting in `REPORT_INPUT_FORMS_FOLDER`), extracts the chosen form, and returns the new Report ID; `main.py` then builds that report. Cancelling the dialog exits without changes. `--report-id` skips the dialog.
 
 **Re-generate an already-extracted report without re-extracting:**
 ```bash
@@ -57,7 +58,7 @@ Standalone helper that pre-populates the Picture column of a fresh input-form co
 
 ### Stage 1: `wordextraction.py` (called from `main.py`)
 
-Reads `INPUT_DOC_PATH` (a copy of `Templates/Template Report Inputs Form.docx` filled in by the user) and writes to `EXTRACTED_DATA_PATH`:
+Reads the input form picked in the file dialog (or passed as `main(docx_path)`) (a copy of `Templates/Template Report Inputs Form.docx` filled in by the user) and writes to `EXTRACTED_DATA_PATH`:
 - Parses a **4-column table** → writes one row to `report_info.csv` with all text metadata (customer, dates, drawings, specs, section text, etc.)
 - Parses a **3-column table** → for each row, extracts a description, caption, and embedded image; writes to `picture_info.csv` and saves images as `report_XXXX/image_00N.jpeg`
 - Assigns sequential Report IDs via `get_next_report_id()`, which reads the max existing ID from `report_info.csv`; `main()` returns the new ID

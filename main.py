@@ -128,7 +128,7 @@ def generate_report(report_id, template_file_path, output_folder_path, extracted
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(
-        description="Extract the input form at INPUT_DOC_PATH and generate its report."
+        description="Browse for an input form, extract it, and generate its report."
     )
     parser.add_argument(
         '--report-id', type=int,
