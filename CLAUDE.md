@@ -26,16 +26,18 @@ python populate_input_pictures.py
 ```
 Produces a fresh copy of the input-form template in `REPORT_INPUT_FORMS_FOLDER` with the Picture column pre-filled. The user then opens that file, fills in Description/Caption text and the 4-column metadata, and points `INPUT_DOC_PATH` at it.
 
-**Stage 1 — extract data from a filled-in input form:**
-```bash
-python wordextraction.py
-```
-
-**Stage 2 — generate a report from extracted data:**
+**Stages 1 + 2 — extract the input form at `INPUT_DOC_PATH` and generate its report:**
 ```bash
 python main.py
 ```
-`main.py` prompts interactively for a Report ID (integer).
+`main.py` calls `wordextraction.main()` (which assigns and returns the new Report ID), then builds that report.
+
+**Re-generate an already-extracted report without re-extracting:**
+```bash
+python main.py --report-id 9
+```
+
+`python wordextraction.py` still works on its own to run extraction only.
 
 There are no tests or lint commands configured in this project.
 
@@ -53,16 +55,16 @@ Standalone helper that pre-populates the Picture column of a fresh input-form co
 - Iterates folder images (natural-sorted by filename, filtered to `.jpg .jpeg .png .gif .bmp .tif .tiff`) and inserts each into column 2 of a successive row, centered, at `width=Inches(3.6)` with height auto-scaled. Adds new rows past the template's 38 data rows if needed.
 - Does **not** import or use `utils.py` — that module targets the output report; the input form has its own structure.
 
-### Stage 1: `wordextraction.py`
+### Stage 1: `wordextraction.py` (called from `main.py`)
 
 Reads `INPUT_DOC_PATH` (a copy of `Templates/Template Report Inputs Form.docx` filled in by the user) and writes to `EXTRACTED_DATA_PATH`:
 - Parses a **4-column table** → writes one row to `report_info.csv` with all text metadata (customer, dates, drawings, specs, section text, etc.)
 - Parses a **3-column table** → for each row, extracts a description, caption, and embedded image; writes to `picture_info.csv` and saves images as `report_XXXX/image_00N.jpeg`
-- Assigns sequential Report IDs via `get_next_report_id()`, which reads the max existing ID from `report_info.csv`
+- Assigns sequential Report IDs via `get_next_report_id()`, which reads the max existing ID from `report_info.csv`; `main()` returns the new ID
 
 ### Stage 2: `main.py` + `utils.py`
 
-Reads the CSVs for a chosen Report ID, copies the template, and populates it entirely in memory using a **single python-docx Document object** opened once and saved once at the end.
+`generate_report(report_id, ...)` reads the CSVs for a Report ID (the one just extracted, or `--report-id`), copies the template, and populates it entirely in memory using a **single python-docx Document object** opened once and saved once at the end.
 
 The document is built in this order:
 1. `update_document_properties` — sets core + custom XML properties

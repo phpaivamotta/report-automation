@@ -192,6 +192,7 @@ def append_to_csv(report_data, report_id, report_csv_path, picture_csv_path, rep
         raise
 
 def main():
+    """Extracts the input form at INPUT_DOC_PATH and returns the new report ID."""
     # Use environment variables
     load_dotenv(override=True)
     base_output_folder = os.getenv('EXTRACTED_DATA_PATH')
@@ -212,6 +213,8 @@ def main():
     # Extract and append data
     report_data = extract_report_data(docx_path, report_folder)
     append_to_csv(report_data, report_id, report_csv_path, picture_csv_path, report_folder)
+
+    return report_id
 
 if __name__ == "__main__":
     main()

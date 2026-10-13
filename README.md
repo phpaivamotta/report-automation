@@ -2,7 +2,7 @@
 
 Turns a filled-in Word form into a finished Maverick Applied Science inspection report (`.docx`).
 
-You type the report text and paste the photos into a simple Word **input form**. Then you run two Python scripts. You get a formatted report with:
+You type the report text and paste the photos into a simple Word **input form**. Then you run one Python script. You get a formatted report with:
 
 - the cover/header fields filled in,
 - the Introduction, Entrance Meeting and Conclusions sections,
@@ -84,7 +84,7 @@ OUTPUT_REPORT_FOLDER_PATH=C:\Users\jdoe\report-automation\Output Report
 # The filled-in input form you want to turn into a report  <-- you change this for every report
 INPUT_DOC_PATH=C:\Users\jdoe\report-automation\Report Input Forms\Unit 12_20260522_095213.docx
 
-# Where extracted text/photos are stored between the two steps
+# Where extracted text/photos are saved (so past reports can be re-generated)
 EXTRACTED_DATA_PATH=C:\Users\jdoe\report-automation\Reports Extracted Data
 
 # (Optional step) Folder of photos to drop into a new input form  <-- change per report if you use it
@@ -107,7 +107,7 @@ Setup is done.
 
 ```
  Folder of photos ──(Step A, optional)──► Input form (.docx) ──(Step B: you fill it in)──►
-   ──(Step C: wordextraction.py)──► Saved data + Report ID ──(Step D: main.py)──► Finished report (.docx)
+   ──(Step C: main.py)──► Finished report (.docx)
 ```
 
 ### Step A (optional, recommended): create an input form with your photos already in it
@@ -133,35 +133,30 @@ Open the form in Word and fill it in. Section 3 below describes every field. Sav
 
 Then set **`INPUT_DOC_PATH`** in `.env` to that file's full path.
 
-### Step C: extract the data from the form
-
-```powershell
-python wordextraction.py
-```
-
-This reads the form, saves the text and photos into `Reports Extracted Data\`, and gives the report the next **Report ID** number (1, 2, 3, …). Remember that number for Step D. Step D also shows the latest ID, so you can look it up there.
-
-> Each run creates a **new** Report ID, even for a form you have run before. If you fix something in the form, just run Step C again and use the new ID. See [Troubleshooting](#5-troubleshooting) to clean up the old entry.
-
-### Step D: generate the report
+### Step C: generate the report
 
 ```powershell
 python main.py
 ```
 
-It asks:
+This does two things in one run:
 
-```
-Enter the report ID to generate (latest is 9):
-```
-
-Type the ID from Step C (usually the "latest" number) and press Enter. The report is saved as:
+1. Reads the form at `INPUT_DOC_PATH`, saves its text and photos into `Reports Extracted Data\`, and gives the report the next **Report ID** number (1, 2, 3, …).
+2. Builds the report from that data and saves it as:
 
 ```
 Output Report\Report_0009_<Customer_Name>.docx
 ```
 
-### Step E: open the report and check it
+> Each run creates a **new** Report ID, even for a form you have run before. If you fix something in the form, just run `python main.py` again. See [Troubleshooting](#5-troubleshooting) to clean up the old entry.
+
+**Re-generating a past report.** To rebuild a report that was already extracted (for example after editing `Template Report.docx`), pass its ID. This skips reading the input form and doesn't create a new ID:
+
+```powershell
+python main.py --report-id 9
+```
+
+### Step D: open the report and check it
 
 Open the report in Word. When Word asks **"This document contains fields that may refer to other files. Update the fields?"**, click **Yes**. Word then numbers the figures and fills in the "Figure N" references.
 
@@ -247,7 +242,7 @@ Each row is one figure in the report, and the figures follow the same order as t
 | A drawing/specification is missing | It contains the word "Drawing"/"Specification" (see section 3). |
 | A photo is missing | That row's picture is floating instead of in line with text, or the row has no picture. |
 | Figure numbers are wrong or blank | In Word: **Ctrl + A**, then **F9**. |
-| I ran `wordextraction.py` twice for the same form | Nothing breaks, it just used two IDs. Generate from the newest ID. To tidy up, delete the extra row from `report_info.csv`, its rows from `picture_info.csv` (the `Report ID` column), and its `report_XXXX` folder. Close the CSVs in Excel before running the scripts again. |
+| I ran `main.py` twice for the same form | Nothing breaks, it just used two IDs and made two reports. Keep the newest. To tidy up, delete the extra row from `report_info.csv`, its rows from `picture_info.csv` (the `Report ID` column), and its `report_XXXX` folder. Close the CSVs in Excel before running the scripts again. |
 | Re-generating overwrote my edited report | `main.py` overwrites `Report_XXXX_<Customer>.docx` if it exists. Rename reports you've hand-edited, or move them out of `Output Report\`. |
 
 ---
@@ -257,8 +252,8 @@ Each row is one figure in the report, and the figures follow the same order as t
 ```
 report-automation/
 ├── populate_input_pictures.py   # Step A – puts a folder of photos into a new input form
-├── wordextraction.py            # Step C – reads the input form, saves data + photos, assigns Report ID
-├── main.py                      # Step D – builds the final report from the saved data
+├── main.py                      # Step C – runs wordextraction.py, then builds the final report
+├── wordextraction.py            # Called by main.py – reads the input form, saves data + photos, assigns Report ID
 ├── utils.py                     # Helper functions used by main.py (all the Word formatting logic)
 ├── requirements.txt             # Python packages to install
 ├── .env.example                 # Copy to .env and fill in your paths
@@ -271,7 +266,7 @@ report-automation/
 │
 ├── Report Input Forms/          # Filled-in input forms (yours)
 ├── Reports Extracted Data/      # Created by Step C: report_info.csv, picture_info.csv, report_XXXX/ photo folders
-└── Output Report/               # Created by Step D: finished reports
+└── Output Report/               # Created by Step C: finished reports
 ```
 
 Git doesn't track the contents of the last three folders, so each person keeps their own.
@@ -282,13 +277,13 @@ Git doesn't track the contents of the last three folders, so each person keeps t
 
 All document editing uses **python-docx** plus hand-built Word XML (**lxml**). Microsoft Word doesn't need to be running and isn't automated. Figure captions are Word `SEQ Figure` fields with a bookmark (`_Ref_Fig_N`), and the "Figure N shows…" bullets are `REF` fields that point at those bookmarks. Word fills in the numbers when the document is opened or the fields are updated.
 
-The two main steps are connected only through the CSV files in `Reports Extracted Data\`, so you can re-generate any past report by its ID without the original form.
+`main.py` runs in two stages: it calls `wordextraction.main()` to extract the input form (which returns the new Report ID), then calls `generate_report()` for that ID. The stages are connected only through the CSV files in `Reports Extracted Data\`, so `python main.py --report-id N` can re-generate any past report without the original form.
 
 ### `wordextraction.py`: input form → CSV + images
 
 ```mermaid
 flowchart TD
-    A([User fills out a copy of the Input Form]) --> B([Run wordextraction.py])
+    A([User fills out a copy of the Input Form]) --> B([Run main.py])
     B --> C[Get next Report ID from report_info.csv]
     C --> D[Create report_XXXX/ folder in Extracted Data]
     D --> E[Open Input Form .docx]
@@ -312,7 +307,7 @@ The form's first table is read row by row. python-docx reports merged cells as r
 
 ```mermaid
 flowchart TD
-    A([Run main.py]) --> B[User enters Report ID]
+    A([wordextraction.main returns Report ID<br/>or --report-id N given]) --> B[generate_report for that ID]
     B --> C[Read report_info.csv]
     B --> D[Read picture_info.csv]
     C & D --> E[Copy Template Report.docx · open as Document object]

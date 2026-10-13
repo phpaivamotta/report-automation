@@ -1,3 +1,4 @@
+import argparse
 from dotenv import load_dotenv
 import os
 from docx import Document
@@ -15,29 +16,13 @@ from utils import read_picture_data
 from utils import update_document_properties
 
 from wordextraction import get_next_report_id
+from wordextraction import main as extract_input_form
 
 
-if __name__ == "__main__":
-
-    load_dotenv(override=True)
-    template_file_path = os.getenv('TEMPLATE_DOC_PATH')
-    output_folder_path = os.getenv('OUTPUT_REPORT_FOLDER_PATH')
-    extracted_data_path = os.getenv('EXTRACTED_DATA_PATH')
-
+def generate_report(report_id, template_file_path, output_folder_path, extracted_data_path):
+    """Builds the output report for report_id from the extracted CSV data."""
     report_csv_path = os.path.join(extracted_data_path, 'report_info.csv')
     picture_csv_path = os.path.join(extracted_data_path, 'picture_info.csv')
-
-    latest_report_id = get_next_report_id(report_csv_path) - 1
-
-    while True:
-        try:
-            report_id = int(input(f"Enter the report ID to generate (latest is {latest_report_id}): "))
-            if 1 <= report_id <= latest_report_id:
-                break
-            else:
-                print(f"Please enter a valid report ID between 1 and {latest_report_id}.")
-        except ValueError:
-            print("Please enter a valid integer.")
 
     report_data = read_report_data(report_csv_path, report_id)
 
@@ -138,3 +123,34 @@ if __name__ == "__main__":
             # Single save — document was held in memory the entire time
             doc.save(output_doc_file_path)
             print(f"Report generated successfully: {output_file_name}")
+
+
+if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser(
+        description="Extract the input form at INPUT_DOC_PATH and generate its report."
+    )
+    parser.add_argument(
+        '--report-id', type=int,
+        help="Re-generate an already-extracted report by ID instead of extracting the input form.",
+    )
+    args = parser.parse_args()
+
+    load_dotenv(override=True)
+    template_file_path = os.getenv('TEMPLATE_DOC_PATH')
+    output_folder_path = os.getenv('OUTPUT_REPORT_FOLDER_PATH')
+    extracted_data_path = os.getenv('EXTRACTED_DATA_PATH')
+
+    if args.report_id is None:
+        # Stage 1: extract the input form; it is assigned the next report ID
+        report_id = extract_input_form()
+        print(f"Input form extracted as report ID {report_id}")
+    else:
+        report_csv_path = os.path.join(extracted_data_path, 'report_info.csv')
+        latest_report_id = get_next_report_id(report_csv_path) - 1
+        if not 1 <= args.report_id <= latest_report_id:
+            raise SystemExit(f"Report ID must be between 1 and {latest_report_id}.")
+        report_id = args.report_id
+
+    # Stage 2: build the report
+    generate_report(report_id, template_file_path, output_folder_path, extracted_data_path)
