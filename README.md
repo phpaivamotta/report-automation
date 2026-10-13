@@ -28,11 +28,11 @@ You do **not** need to know Python to use it. You only run commands and edit one
 
 ## 1. One-time setup
 
-You only do this once per computer. These steps are for **Windows**. The project uses `pywin32`, which only installs on Windows.
+You only do this once per computer. These steps are written for **Windows**. Microsoft Word doesn't need to be installed for the scripts to run, but you'll want it to fill in the input form and review the report.
 
 ### 1.1 Install Python
 
-Install **Python 3.11** (3.9 or newer works) from <https://www.python.org/downloads/>. In the installer, tick **"Add python.exe to PATH"**.
+Install **Python 3.11** (3.9 or newer works) from <https://www.python.org/downloads/>. In the installer, tick **"Add python.exe to PATH"**, and leave **"tcl/tk and IDLE"** ticked (it is by default). `main.py` needs it for the file browser.
 
 To check that it worked, open a terminal (PowerShell, or the terminal in VS Code) and run:
 
@@ -134,7 +134,7 @@ Open the form in Word and fill it in. Section 3 below describes every field. Sav
 python main.py
 ```
 
-A file browser pops up in the `Report Input Forms\` folder. Select the form you filled in during Step B and click **Open**. Clicking **Cancel** stops the run without changing anything.
+A file browser pops up in the `Report Input Forms\` folder. Select the form you filled in during Step B and click **Open**. Clicking **Cancel** stops the run (`No input form selected.`) without changing anything. If you don't see the window, check behind VS Code or in the taskbar.
 
 The script then does two things:
 
@@ -152,6 +152,8 @@ Output Report\Report_0009_<Customer_Name>.docx
 ```powershell
 python main.py --report-id 9
 ```
+
+The ID must be one that already exists (between 1 and the latest ID in `report_info.csv`). Otherwise the script stops with `Report ID must be between 1 and N.`
 
 ### Step D: open the report and check it
 
@@ -207,7 +209,7 @@ Each row is one figure in the report, and the figures follow the same order as t
 | Change the report's look: logo, fonts, header/footer, boilerplate wording, page layout | **`Templates\Template Report.docx`**. Edit it in Word like any document. See the warning below. |
 | Change the form people fill in | **`Templates\Template Report Inputs Form.docx`**. Keep the labels and the two-table layout the same, or the extraction script will stop finding the fields. |
 | Change photo size in the input form | `PICTURE_WIDTH` near the top of `populate_input_pictures.py` (default 3.6 inches). |
-| Change the "Equipment Drawing: " prefix, bullet fonts, or spacing | `utils.py`: `add_formatted_bullets` and the `_set_run_font` / `_set_para_spacing` helpers near the top. |
+| Change the "Equipment Drawing: " prefix, bullet fonts, spacing, or justification | `utils.py`: `add_formatted_bullets` and the helpers near the top: `_set_run_font` (Calibri 12 pt), `_set_para_spacing` (6 pt before/after), and `_disable_contextual_spacing` (keeps that spacing between consecutive bullets). |
 | Change photo size/layout in the final report | `utils.py`: `add_table_with_images`. |
 | Change the output filename | `main.py`: the line that builds `output_file_name`. |
 | Start Report IDs over from 1 | Delete (or move somewhere safe) `report_info.csv`, `picture_info.csv` and the `report_XXXX` folders in `Reports Extracted Data\`. |
@@ -232,7 +234,10 @@ Each row is one figure in the report, and the figures follow the same order as t
 | Problem | Fix |
 |---|---|
 | `ModuleNotFoundError: No module named 'docx'` (or `dotenv`) | The virtual environment isn't active. Run `.venv\Scripts\Activate.ps1`, or run `pip install -r requirements.txt`. |
-| `Input DOCX file not found` / `TypeError: ... NoneType` | `.env` is missing, misnamed (it must be exactly `.env`, not `.env.txt`), or a path in it is wrong. Check each path in File Explorer. |
+| `TypeError: ... NoneType`, `Template file not found`, or the file browser opens in the wrong folder | `.env` is missing, misnamed (it must be exactly `.env`, not `.env.txt`), or a path in it is wrong. Check each path in File Explorer. |
+| `No input form selected.` | You clicked **Cancel** or closed the file browser. Run `python main.py` again and pick a form. |
+| `Report ID must be between 1 and N.` | The `--report-id` you passed doesn't exist yet. Check the `Report ID` column in `report_info.csv`. |
+| `ModuleNotFoundError: No module named 'tkinter'` | Python was installed without Tcl/Tk. Re-run the Python installer, choose *Modify*, and tick **tcl/tk and IDLE**. |
 | `PermissionError` when generating the report | The output report (or input form) is open in Word. Close it and run again. |
 | A section, the drawings, or the photos are missing from the report, and the terminal says `Header '…' not found` | Someone changed one of the protected phrases in `Template Report.docx` (see section 4). |
 | A field in the report is blank | Its label in the input form was changed, or the value cell was left empty. |
@@ -281,7 +286,8 @@ All document editing uses **python-docx** plus hand-built Word XML (**lxml**). M
 ```mermaid
 flowchart TD
     A([User fills out a copy of the Input Form]) --> B([Run main.py])
-    B --> C[Get next Report ID from report_info.csv]
+    B --> B2[Pick the Input Form in the file browser]
+    B2 --> C[Get next Report ID from report_info.csv]
     C --> D[Create report_XXXX/ folder in Extracted Data]
     D --> E[Open Input Form .docx]
 
@@ -335,9 +341,10 @@ The document is opened once, changed in memory, and saved once at the end. `main
 
 | Function | Purpose |
 |---|---|
+| `read_report_data(csv_path, report_id)` / `read_picture_data(csv_path, report_id)` | Read one report's rows back from the CSVs |
 | `update_document_properties(doc, report_data)` | Fills core + custom Word document properties |
 | `insert_formatted_text_after_header(doc, header, text)` | Inserts a formatted paragraph after a heading |
-| `add_formatted_bullets(doc, header, items, is_drawing)` | Replaces the template bullet with the list; prefixes drawings with `"Equipment Drawing: "` |
+| `add_formatted_bullets(doc, header, items, is_drawing)` | Replaces the template bullet with a justified list; prefixes drawings with `"Equipment Drawing: "` |
 | `add_table_with_images(doc, header, counter, cols, img1, img2)` | Creates a 1- or 2-column image table, returns the `Table` |
 | `add_caption_paragraph(after_elem, caption, fig_idx)` | Inserts a `SEQ` caption with a bookmark, returns `(bookmark_name, xml_element)` |
 | `add_bullets_above_tables(doc, table, cols)` | Inserts placeholder bullets above an image table |
